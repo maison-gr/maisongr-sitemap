@@ -37,13 +37,17 @@ const list = (body: string) => [...body.matchAll(/["']([\w-]+)["']/g)].map((m) =
 export function findLocales(files: string[]): { list: string[]; default: string } | undefined {
   for (const f of files) {
     const src = read(f);
-    const locales = src.match(/\blocales\s*:\s*\[([^\]]+)\]/) ?? src.match(/\b(?:LOCALES|SUPPORTED_LOCALES|LANGUAGES)\s*(?::[^=]+)?=\s*\[([^\]]+)\]/);
+    const locales =
+      src.match(/\blocales\s*:\s*\[([^\]]+)\]/) ??
+      src.match(/\b(?:LOCALES|SUPPORTED_LOCALES|LANGUAGES)\s*(?::[^=]+)?=\s*\[([^\]]+)\]/) ??
+      // A TypeScript union: export type Lang = "fr" | "en";
+      src.match(/\btype\s+(?:Lang|Locale|Language)s?\s*=\s*((?:\s*\|?\s*["'][\w-]+["'])+)\s*;/);
     if (!locales) continue;
     const found = list(locales[1]!);
     if (found.length < 2) continue;
     const def =
       src.match(/\bdefaultLocale\s*:\s*["']([\w-]+)["']/)?.[1] ??
-      files.map(read).map((s) => s.match(/\bDEFAULT_LOCALE\s*(?::[^=]+)?=\s*["']([\w-]+)["']/)?.[1]).find(Boolean) ??
+      files.map(read).map((s) => s.match(/\b(?:DEFAULT_LOCALE|DEFAULT_LANG|DEFAULT_LANGUAGE|defaultLang)\s*(?::[^=]+)?=\s*["']([\w-]+)["']/)?.[1]).find(Boolean) ??
       found[0]!;
     return { list: found, default: found.includes(def) ? def : found[0]! };
   }
