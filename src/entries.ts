@@ -84,7 +84,10 @@ function fill(pattern: string, row: ParamRow): string | null {
       missing = true;
       return "";
     }
-    return (Array.isArray(value) ? value : [value]).map((v) => encodeURIComponent(String(v))).join("/");
+    // A catch-all takes its path as an array or as "a/b": either way each part is
+    // encoded on its own, so the slashes stay slashes and never become %2F.
+    const parts = Array.isArray(value) ? value : whole.includes("...") ? String(value).split("/").filter(Boolean) : [value];
+    return parts.map((v) => encodeURIComponent(String(v))).join("/");
   });
   return missing ? null : path.replace(/\/{2,}/g, "/").replace(/(.)\/$/, "$1") || "/";
 }

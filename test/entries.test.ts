@@ -55,6 +55,14 @@ describe("expand", () => {
     expect(out.map((e) => e.loc)).toEqual([`${site}/notes/v2`, `${site}/en-docs`]);
   });
 
+  it("takes a catch-all's path as a string too, keeping its slashes", async () => {
+    const out = await expand([{ pattern: "/adhd/[...slug]" }, { pattern: "/notes/[slug]" }], {
+      site,
+      params: { "/adhd/[...slug]": () => [{ slug: "fundamentals/what-is-adhd" }, { slug: ["a b", "c"] }], "/notes/[slug]": () => [{ slug: "a/b" }] },
+    });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/adhd/fundamentals/what-is-adhd`, `${site}/adhd/a%20b/c`, `${site}/notes/a%2Fb`]);
+  });
+
   it("lets an optional catch-all be empty", async () => {
     const out = await expand([{ pattern: "/docs/[[...path]]" }], { site, params: { "/docs/[[...path]]": () => [{}, { path: ["a", "b"] }] } });
     expect(out.map((e) => e.loc)).toEqual([`${site}/docs`, `${site}/docs/a/b`]);
