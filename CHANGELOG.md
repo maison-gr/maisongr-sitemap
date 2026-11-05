@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Changed
+
+- `maisongr-sitemap/vite` answers `/sitemap`, `/sitemap/` and `/sitemap/index.html` with a redirect to `/sitemap.xml`, so the sitemap has one address in dev, as with the host rules. The README's Cloudflare and Vercel rules add the same redirect.
+
 ## [1.5.0] - 2026-11-05
 
 Found by testing AquaDrill, a Vite app on a static host, as its visitors and search engines see it.

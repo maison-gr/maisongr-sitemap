@@ -59,15 +59,11 @@ describe("the Vite plugin", () => {
     expect(body).not.toContain("*");
     expect(body).toContain('href="/sitemap.css"');
 
-    for (const path of ["/sitemap", "/sitemap/", "/sitemap/index.html"]) {
-      const page = await fetch(`${base}${path}`);
-      expect(page.headers.get("content-type")).toBe("text/html; charset=utf-8");
-      const html = await page.text();
-      expect(html).toContain('<html lang="fr"');
-      expect(html).toContain('href="/services"');
-      // Each page counted in index.html's language, as the prerendered build counts it.
-      expect(html).toContain("<b>2</b> FR");
-    }
+    const html = await (await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document" } })).text();
+    expect(html).toContain('<html lang="fr"');
+    expect(html).toContain('href="/services"');
+    // Each page counted in index.html's language, as the prerendered build counts it.
+    expect(html).toContain("<b>2</b> FR");
     expect((await fetch(`${base}/sitemap.css`)).headers.get("content-type")).toBe("text/css; charset=utf-8");
     expect((await fetch(`${base}/sitemap/page.css`)).status).toBe(200);
     expect((await fetch(`${base}/sitemap/page.js`)).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
@@ -84,6 +80,15 @@ describe("the Vite plugin", () => {
     expect(crawler.headers.get("content-type")).toBe("application/xml; charset=utf-8");
     expect(crawler.headers.get("vary")).toBe("Sec-Fetch-Dest");
     expect(crawler.headers.get("x-robots-tag")).toBeNull();
+  });
+
+  it("has one address: /sitemap, /sitemap/ and the page's own file redirect to /sitemap.xml", async () => {
+    const base = await devServer(project(SPA), sitemap({ site: "https://aquadrill.example" }));
+    for (const path of ["/sitemap", "/sitemap/", "/sitemap/index.html", "/sitemap/?q=1"]) {
+      const res = await fetch(`${base}${path}`, { redirect: "manual" });
+      expect(res.status).toBe(308);
+      expect(res.headers.get("location")).toBe("/sitemap.xml");
+    }
   });
 
   it("takes the site's colours from its source stylesheets", async () => {

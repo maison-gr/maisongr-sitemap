@@ -82,9 +82,16 @@ export function sitemap(options: ViteSitemapOptions) {
     configureServer(server: DevServer) {
       server.middlewares.use((req, res, next) => {
         const path = (req.url ?? "/").split(/[?#]/)[0]!.replace(/^\//, "");
-        // One address, two readers, as the host's rule does in production: a browser opening /sitemap.xml gets the page.
+        // One address, as the host's rules do in production: the page's own file is never an address people land on.
+        if (path === "sitemap" || path === "sitemap/" || path === "sitemap/index.html") {
+          res.statusCode = 308;
+          res.setHeader("Location", "/sitemap.xml");
+          res.end();
+          return;
+        }
+        // Two readers: a browser opening /sitemap.xml gets the page, a crawler the XML.
         const browser = req.headers["sec-fetch-dest"] === "document";
-        const file = path === "sitemap" || path === "sitemap/" || (path === "sitemap.xml" && browser) ? "sitemap/index.html" : path;
+        const file = path === "sitemap.xml" && browser ? "sitemap/index.html" : path;
         if (file !== "sitemap.xml" && file !== "sitemap.css" && !file.startsWith("sitemap/")) return next();
         let body: string | undefined;
         try {

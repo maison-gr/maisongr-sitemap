@@ -286,6 +286,7 @@ A file can't answer two readers by itself, so one rule at your host does it: whe
    `(http.request.uri.path eq "/sitemap.xml" and any(http.request.headers["sec-fetch-dest"][*] eq "document"))`
    Path: *Rewrite to* → *Static* → `/sitemap/index.html`. Query: preserve.
 2. *Rules → Transform Rules → Modify Response Header*, expression `(raw.http.request.uri.path eq "/sitemap.xml")`: *Set static* `Vary` to `Sec-Fetch-Dest`.
+3. *Rules → Redirect Rules*, so the page's own file is never an address of its own: expression `(raw.http.request.uri.path in {"/sitemap" "/sitemap/" "/sitemap/index.html"})`, *Dynamic* `concat("https://", http.host, "/sitemap.xml")`, status 301. It reads the address the visitor asked for, so step 1's rewrite isn't redirected.
 
 **Vercel**, in `vercel.json`:
 
@@ -294,7 +295,11 @@ A file can't answer two readers by itself, so one rule at your host does it: whe
   "rewrites": [
     { "source": "/sitemap.xml", "has": [{ "type": "header", "key": "sec-fetch-dest", "value": "document" }], "destination": "/sitemap/index.html" }
   ],
-  "headers": [{ "source": "/sitemap.xml", "headers": [{ "key": "Vary", "value": "Sec-Fetch-Dest" }] }]
+  "headers": [{ "source": "/sitemap.xml", "headers": [{ "key": "Vary", "value": "Sec-Fetch-Dest" }] }],
+  "redirects": [
+    { "source": "/sitemap", "destination": "/sitemap.xml", "permanent": true },
+    { "source": "/sitemap/index.html", "destination": "/sitemap.xml", "permanent": true }
+  ]
 }
 ```
 
@@ -305,7 +310,7 @@ curl -sI https://www.example.com/sitemap.xml                              # appl
 curl -sI -H "Sec-Fetch-Dest: document" https://www.example.com/sitemap.xml # text/html
 ```
 
-`vite dev` with the plugin below answers the same way, so what you test locally is what the rule serves. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
+`vite dev` with the plugin below answers the same way, `/sitemap/` redirect included, so what you test locally is what the rules serve. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
 
 ## Single-page apps
 
