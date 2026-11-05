@@ -27,7 +27,7 @@ npx @maison-gr/sitemap init
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
 | **Any static site**, from any generator | [`static`](#static-sites) on the build output |
 
-Each one has been checked on a real production build: Next.js 15 and 16 (with `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`) and Express 5.
+Each one has been checked on a real production build: Next.js 15 and 16 (with `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4 and React Router 8.
 
 ## What `init` does
 
@@ -75,13 +75,15 @@ export const GET = sitemap({
 });
 ```
 
+With Next.js 16's `cacheComponents`, `init` leaves out the `dynamic` line, which that mode refuses. The route stays dynamic because it reads the request.
+
 Astro, SvelteKit and Nuxt routes call `createSitemap` from `@maison-gr/sitemap` with the same options.
 
 | Option | |
 |---|---|
 | `manifest` | What the build step wrote. Without one, the sitemap lists `entries` alone, in a neutral theme. |
-| `params` | Values for dynamic routes, keyed by the route as the build report names it (`"/blog/[slug]"`). Each row may carry its own `lastmod`. |
-| `entries` | Extra addresses no route file describes. A `loc` may be a path (`"/press"`). |
+| `params` | Values for dynamic routes, keyed by the route as the build report names it (`"/blog/[slug]"`). Each row may carry its own `lastmod` and `images`. |
+| `entries` | Extra addresses no route file describes. A `loc` may be a path (`"/press"`). Each may carry `images`, `videos` and `news`. |
 | `exclude` | Paths to leave out, from routes and `entries` alike: exact (`"/thanks"`), prefix (`"/drafts/"`) or `RegExp`. |
 | `site` | The address the site is served at. Defaults to the manifest's, then the request's. |
 | `basePath`, `trailingSlash` | Override what was read from your config. |
@@ -93,6 +95,35 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `@maison-gr/sitemap` 
 A `lastmod` can be a `YYYY-MM-DD` string, an ISO timestamp, a `Date` or milliseconds. One that isn't a real date is left out, because an invalid date makes Search Console reject the whole file.
 
 Past 50,000 addresses, the sitemap becomes a sitemap index of `?part=N` files.
+
+There is no `changefreq` or `priority`: Google says it ignores both.
+
+## Images, videos and news
+
+Google reads three extensions to the sitemap. Give them per address, and the file declares only the ones it uses:
+
+```ts
+entries: async () =>
+  (await getPosts()).map((p) => ({
+    loc: `/blog/${p.slug}`,
+    lastmod: p.updatedAt,
+    images: [p.cover], // up to 1,000 per page; paths resolve against the page
+    videos: p.video ? [{ thumbnail: p.video.poster, title: p.title, description: p.summary, content: p.video.src }] : [],
+    news: p.isNews ? { publication: { name: "Harbour Daily", language: "en" }, publicationDate: p.publishedAt, title: p.title } : undefined,
+  })),
+```
+
+- **Images** need only their address. Google no longer reads captions, titles or licences, so none are written.
+- **Videos** need four things:
+  - a thumbnail;
+  - a title;
+  - a description, up to 2,048 characters;
+  - the file (`content`) or a page that plays it (`player`).
+
+  `duration`, `publicationDate`, `familyFriendly` and `live` are optional. A video missing a required field is left out.
+- **News** is for news publishers, and Google wants only articles from the last two days.
+
+Rows from `params` take `images` too.
 
 ## Express and `node:http`
 
@@ -132,7 +163,7 @@ export default {
   },
 };
 
-// React Router: app/routes/sitemap[.]xml.ts
+// React Router: route("sitemap.xml", "routes/sitemap.ts") in app/routes.ts, then in app/routes/sitemap.ts
 export const loader = ({ request }) => sitemap(request);
 ```
 
@@ -170,6 +201,25 @@ npx @maison-gr/sitemap static dist --site https://www.example.com
 It reads the built HTML, so each page's language and `hreflang` links come from the pages themselves. It leaves out pages marked `noindex`, redirects, and sign-in and account pages. The theme comes from your stylesheets and the CSS your build inlined. For a static build of Astro, SvelteKit or Nuxt, `init` adds this step to the end of your `build` script.
 
 Static mode writes no `lastmod`: built files don't say when their content changed, and a build date would be false.
+
+With `--images`, each page's `og:image` and `<img>` sources go into an image sitemap. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
+
+## Telling search engines
+
+- **robots.txt.** Crawlers find a sitemap through a `Sitemap:` line in `robots.txt`. `init` tells you when the line is missing, without editing the file.
+- **Search Console and Bing Webmaster Tools.** Submit `https://your.site/sitemap.xml` once in each.
+- **IndexNow.** Bing, Yandex, Seznam, Naver and the other participating engines take a list of changed addresses directly. After a deploy:
+
+  ```sh
+  npx maisongr-sitemap indexnow --site https://www.example.com --key your-key
+  ```
+
+  It reads the live sitemap (or a built one, with `--sitemap dist/sitemap.xml`) and sends the addresses whose `lastmod` is on or after yesterday.
+  - `--since 2026-11-01` picks the date.
+  - `--all` sends everything.
+  - `--dry-run` lists the addresses without sending them.
+
+  The key is yours to choose: 8 to 128 letters, digits or dashes. The site must serve it at `/<key>.txt`, and the command checks that before it sends anything.
 
 ## Limits
 
