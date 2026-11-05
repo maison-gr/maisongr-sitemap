@@ -138,10 +138,74 @@ describe("init for Astro, SvelteKit and Nuxt", () => {
 });
 
 describe("init on a server whose routes live in code", () => {
-  it("shows the Node adapter instead of scanning", async () => {
-    const { code, err } = await run(["init"], project({ "package.json": '{"dependencies":{"express":"5"}}' }));
-    expect(code).toBe(1);
-    expect(err).toContain('import { sitemap } from "maisongr-sitemap/node"');
+  // A workspace: an Express API serving the Vite app it sits beside, fonts hoisted to the root node_modules.
+  const WORKSPACE = {
+    "package.json": '{"private":true,"workspaces":["frontend","backend"]}',
+    "backend/package.json": '{\n  "name": "api",\n  "main": "src/index.js",\n  "scripts": { "start": "node src/index.js" },\n  "dependencies": { "express": "5" }\n}\n',
+    "backend/src/index.js": [
+      "const path = require('path');",
+      "const BASE_URL = (process.env.ATLAS_URL || 'https://www.atlas.dev').replace(/\\/+$/, '');",
+      "const FRONTEND_DIST = path.join(__dirname, '../../frontend/dist');",
+      "app.use('/assets', express.static(path.join(FRONTEND_DIST, 'assets'), { maxAge: '1y' }));",
+      "app.use(express.static(FRONTEND_DIST, { index: false }));",
+      "app.get('/sitemap-old.xml', oldSitemap);",
+    ].join("\n"),
+    "frontend/package.json": '{"name":"web","dependencies":{"@fontsource-variable/fraunces":"5"}}',
+    "frontend/index.html": "<!doctype html><html><head><title>Atlas | Jobs that fit</title></head><body></body></html>",
+    "frontend/public/favicon.ico": "",
+    "frontend/src/main.tsx": "import '@fontsource-variable/fraunces';",
+    "frontend/src/index.css": ":root{--color-bg:#f3f1ea;--color-text:#171c1a;--color-text-2:#56615b;--color-action:#123c35}",
+    "frontend/tailwind.config.js": "module.exports = { theme: { extend: { fontFamily: { display: ['\"Fraunces Variable\"', 'Georgia', 'serif'], sans: ['ui-sans-serif'] } } } };",
+    "node_modules/@fontsource-variable/fraunces/index.css": "@font-face{font-family:'Fraunces Variable';font-weight:100 900;src:url(./files/fraunces-latin-wght-normal.woff2) format('woff2-variations')}",
+    "node_modules/@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2": "wOF2",
+  };
+
+  it("reads the theme from the frontend the server serves, and writes a CommonJS module beside its entry", async () => {
+    const root = project(WORKSPACE);
+    const { code, out } = await run(["init", "--offline"], join(root, "backend"));
+    expect(code).toBe(0);
+
+    const manifest = JSON.parse(readFileSync(join(root, "backend/src/sitemap.manifest.json"), "utf8"));
+    expect(manifest).toMatchObject({ framework: "express", site: "https://www.atlas.dev", routes: [] });
+    expect(manifest.theme).toMatchObject({ name: "Atlas", icon: "/favicon.ico", light: { background: "#f3f1ea", foreground: "#171c1a", muted: "#56615b", accent: "#123c35" } });
+    // The Tailwind key says Fraunces is the display face; its hoisted file is served from the frontend's public/.
+    const url = "/_sitemap/fraunces-variable-fraunces-latin-wght-normal.woff2";
+    expect(manifest.theme.fonts).toEqual([{ role: "display", family: "Fraunces Variable", files: [{ url, weight: "100 900" }] }]);
+    expect(readFileSync(join(root, `frontend/public${url}`), "utf8")).toBe("wOF2");
+
+    const module = readFileSync(join(root, "backend/src/sitemap.js"), "utf8");
+    expect(module).toContain('const manifest = require("./sitemap.manifest.json");');
+    expect(module).toContain('import("maisongr-sitemap/node")');
+    expect(module).toContain("module.exports.invalidate");
+    expect(JSON.parse(readFileSync(join(root, "backend/package.json"), "utf8")).scripts.build).toBe("maisongr-sitemap build");
+    expect(out).toContain('app.get("/sitemap.xml", require("./sitemap.js"));');
+    expect(out).toContain("src/index.js already answers a /sitemap…xml route");
+
+    // build reads it all again, and leaves the module alone.
+    writeFileSync(join(root, "backend/src/sitemap.js"), "// mine");
+    expect((await run(["build", "--offline"], join(root, "backend"))).out).toContain("theme from ../frontend");
+    expect(readFileSync(join(root, "backend/src/sitemap.js"), "utf8")).toBe("// mine");
+  });
+
+  it("writes an ES module for a server that is one, themed from the public/ folder it serves", async () => {
+    const root = project({
+      "package.json": '{"type":"module","dependencies":{"express":"5"}}',
+      "server.js": 'app.use(express.static("public"));',
+      "public/index.html": "<title>Harbour</title><style>:root{--background:#fff;--foreground:#111}</style>",
+    });
+    expect((await run(["init", "--offline"], root)).code).toBe(0);
+    const module = readFileSync(join(root, "sitemap.js"), "utf8");
+    expect(module).toContain('import { sitemap as createSitemap } from "maisongr-sitemap/node";');
+    expect(module).toContain("export const sitemap = createSitemap({ manifest, entries });");
+    expect(JSON.parse(readFileSync(join(root, "sitemap.manifest.json"), "utf8")).theme).toMatchObject({ name: "Harbour", light: { background: "#fff", foreground: "#111" } });
+  });
+
+  it("still sets the sitemap up, in a neutral theme, when there is no frontend to read", async () => {
+    const root = project({ "package.json": '{"dependencies":{"express":"5"}}', "index.js": "" });
+    const { code, out } = await run(["init", "--offline"], root);
+    expect(code).toBe(0);
+    expect(out).toContain("Frontend: none found");
+    expect(readFileSync(join(root, "sitemap.js"), "utf8")).toContain("module.exports = async function sitemap");
   });
 });
 

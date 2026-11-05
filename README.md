@@ -51,7 +51,7 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 | **SvelteKit** | `src/routes/sitemap.xml/+server.ts` |
 | **Nuxt** 3 and 4 | `server/routes/sitemap.xml.ts` |
 | **Static builds**: Astro without an adapter, SvelteKit with `adapter-static`, `nuxt generate` | Static mode, run after your build |
-| **Express**, Connect, Polka, `node:http` | The [Node adapter](#express-and-nodehttp), with the addresses you give it |
+| **Express**, Connect, Polka, `node:http` | `sitemap.js` beside the server's entry, themed from the frontend it serves (see [Express](#express-and-nodehttp)) |
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
 | **Any static site**, from any generator | [`static`](#static-sites) on the build output |
 
@@ -176,7 +176,23 @@ Rows from `params` take `images` too.
 
 ## Express and `node:http`
 
-A server whose routes live in code has nothing to scan, so you give it the addresses:
+A server's routes live in code, but its look lives in the frontend it serves. `npx maisongr-sitemap init` in the server's folder:
+
+- follows its `express.static(...)` folders to that frontend: a `public/` folder, or the project a `dist/` is built from (a Vite app beside an API, in a workspace or not);
+- reads the theme there (CSS tokens, light and dark, `index.html`, a Tailwind `fontFamily`, Fontsource packages even when a workspace hoists them) and copies the fonts to its `public/_sitemap/`;
+- writes `sitemap.manifest.json` and `sitemap.js` beside the server's entry, as CommonJS or an ES module to match it, and prints the line that mounts it.
+
+You list the pages in `sitemap.js`, since only your code knows them:
+
+```js
+async function entries() {
+  return [{ loc: "/" }, ...(await db.posts()).map((p) => ({ loc: `/blog/${p.slug}`, lastmod: p.updatedAt }))];
+}
+```
+
+Call `sitemap.invalidate()` when a post is published, so it is listed at once. `maisongr-sitemap build` reads the frontend's theme again after a redesign.
+
+Without the CLI, the adapter takes the same options as everything else:
 
 ```ts
 import { sitemap } from "maisongr-sitemap/node";
@@ -279,7 +295,7 @@ With `--images`, each page's `og:image` and `<img>` sources go into an image sit
 
 Node 20.9 or later. No runtime dependencies.
 
-The package is an ES module. A CommonJS project (`require("maisongr-sitemap/node")`) needs Node 20.19 or 22.12 or later, which load ES modules through `require`.
+The package is an ES module. A CommonJS project that calls `require("maisongr-sitemap/node")` itself needs Node 20.19 or 22.12 or later, which load ES modules through `require`; the `sitemap.js` that `init` writes loads it with `import()`, which works on every supported version.
 
 ## License
 

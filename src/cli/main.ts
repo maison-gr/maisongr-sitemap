@@ -3,14 +3,16 @@ import { dirname, join, relative } from "node:path";
 import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
-import { withBuildStep, withStaticStep } from "../build/scripts.js";
+import { buildNode, nodePaths, type ModuleFormat } from "../build/node-build.js";
+import { sourceFiles } from "../build/project.js";
+import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
-import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
+import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
 const HELP = `maisongr-sitemap
 
-  maisongr-sitemap init              Detect the framework (Next.js, Astro, SvelteKit, Nuxt) and set the sitemap up
+  maisongr-sitemap init              Detect the framework (Next.js, Astro, SvelteKit, Nuxt, Express) and set the sitemap up
   maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
   maisongr-sitemap static <dir> --site <url>
                                      For sites with no server: write sitemap.xml and /sitemap/ into <dir>
@@ -58,9 +60,10 @@ const DEV_PORT: Record<ServerKind["kind"], number> = { next: 3000, astro: 4321, 
 
 const REBUILT = "manifest.json could not be read (a merge conflict?), so it was rebuilt from the project. Dates Git cannot see in this clone are left out.";
 
-function printReport(r: BuildReport) {
+/** `pages` is false for a server whose pages come from its code, not from files. */
+function printReport(r: BuildReport, pages = true) {
   if (r.rebuilt) say(`  Note: ${REBUILT}`);
-  say(`  ${plural(r.routes, "page")} found, ${r.dated} dated from Git`);
+  if (pages) say(`  ${plural(r.routes, "page")} found, ${r.dated} dated from Git`);
   if (r.locales) say(`  Languages: ${r.locales.list.join(", ")} (x-default: ${r.locales.default})`);
   say(`  Site: ${r.site ?? "not found; the request's address is used (set SITEMAP_SITE_URL or pass site)"}`);
   say(`  Theme: ${r.theme.name} · ${r.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${r.theme.fonts.map((f) => `${f.family} (${f.role})`).join(", ") || "system"}`);
@@ -174,18 +177,56 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
 }
 
+/** The line that mounts the sitemap module, written as the server's own files import. */
+function mountLine(entry: string | null, module: string, format: ModuleFormat) {
+  const from = `./${relative(entry ? dirname(entry) : root, module).split("\\").join("/").replace(/\.ts$/, ".js")}`;
+  return format === "cjs" ? `app.get("/sitemap.xml", require("${from}"));` : `import { sitemap } from "${from}";  app.get("/sitemap.xml", sitemap);`;
+}
+
+/** Server files, other than this package's module, that already answer /sitemap.xml. */
+function ownSitemapRoutes(module: string): string[] {
+  return sourceFiles(root)
+    .filter((f) => f !== module && !/[\\/](test|tests|__tests__)[\\/]|\.(test|spec)\./.test(f))
+    .filter((f) => {
+      const src = readFileSync(f, "utf8");
+      return /\.(?:get|use|all)\s*\(\s*["'`]\/sitemap[\w-]*\.xml/.test(src) && !src.includes("maisongr-sitemap");
+    });
+}
+
+/** An Express-style server: its routes live in code, its look in the frontend it serves. */
+async function initNode(found: Extract<ReturnType<typeof detect>, { kind: "node" }>) {
+  const paths = nodePaths(root);
+  say(`\n${found.name} server${paths.entry ? ` · ${rel(paths.entry)}` : ""}`);
+  const report = await buildNode(root, found, { offline: flag("offline") });
+  say(report.client ? `  Frontend: ${rel(report.client.root) || "."} (fonts go to ${rel(report.client.publicDir)}/_sitemap/)` : "  Frontend: none found; the page uses a neutral theme (pass `theme` to set colours and fonts).");
+  printReport(report, false);
+
+  try {
+    writeFileSync(paths.module, nodeModuleSource(paths.format, mountLine(paths.entry, paths.module, paths.format)), { flag: "wx" });
+    say(`\n  Wrote  ${rel(paths.module)}  (list your pages in its entries())`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    say(`\n  Kept   ${rel(paths.module)}  (already there)`);
+  }
+  say(`  Wrote  ${rel(report.manifestPath)}  (commit it)`);
+  if (report.theme.fonts.length && report.client) say(`  Wrote  ${rel(report.client.publicDir)}/_sitemap/  (the page's fonts, served from your own domain: commit them)`);
+  say(`  Build  ${editScripts((s) => (s?.build ? withBuildStep(s) : { scripts: { ...s, build: COMMAND }, note: `"build" script added to package.json: run it when the frontend's design changes` }))}`);
+
+  say();
+  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install maisongr-sitemap`);
+  say(`  Mount: ${mountLine(paths.entry, paths.module, paths.format)}`);
+  say(`         before any catch-all route (a single-page app's "*"), so the sitemap answers first.`);
+  for (const f of ownSitemapRoutes(paths.module)) say(`  Replace: ${rel(f)} already answers a /sitemap…xml route. Remove it, so there is one sitemap.`);
+  say(`  Check: robots.txt names ${report.site ?? "https://your.site"}/sitemap.xml.`);
+  say(`  Open /sitemap.xml in a browser: the page. curl it: the XML.\n`);
+}
+
 async function init() {
   const found = detect(root);
   if (found.kind === "unsupported") {
     fail(`${found.name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
   }
-  if (found.kind === "node") {
-    fail(
-      `${found.name} detected. Its routes live in code, so there is nothing to scan: serve the sitemap with the addresses you have.\n\n` +
-        `  import { sitemap } from "maisongr-sitemap/node";\n\n` +
-        `  app.get("/sitemap.xml", sitemap({\n    site: "https://your.site",\n    entries: async () => [{ loc: "/" }, { loc: "/pricing", lastmod: "2026-11-04" }],\n  }));`,
-    );
-  }
+  if (found.kind === "node") return initNode(found);
   if (found.kind === "static") {
     fail(`A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site`);
   }
@@ -197,8 +238,14 @@ async function init() {
 
 async function build() {
   const found = detect(root);
+  if (found.kind === "node") {
+    if (!existsSync(nodePaths(root).manifest)) fail("No sitemap set up here yet. Run `maisongr-sitemap init` first.");
+    const report = await buildNode(root, found, { offline: flag("offline") });
+    say(`maisongr-sitemap: theme from ${report.client ? rel(report.client.root) || "." : "nothing (neutral)"} → ${rel(report.manifestPath)}`);
+    return;
+  }
   if (found.kind !== "next" && found.kind !== "astro" && found.kind !== "sveltekit" && found.kind !== "nuxt") {
-    fail("`build` reads Next.js, Astro, SvelteKit and Nuxt projects. For a static site use `maisongr-sitemap static <dir> --site <url>`.");
+    fail("`build` reads Next.js, Astro, SvelteKit, Nuxt and Express projects. For a static site use `maisongr-sitemap static <dir> --site <url>`.");
   }
   const fw = found as ServerKind;
   if (fw.kind !== "next" && !fw.server) {

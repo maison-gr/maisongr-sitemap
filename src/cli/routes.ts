@@ -114,3 +114,50 @@ ${PARAMS_HINT(`{ "/blog/[slug]": async () => (await queryCollection("blog").all(
 export default defineEventHandler((event) => sitemap(event.req instanceof Request ? event.req : toWebRequest(event)));
 `;
 }
+
+const NODE_ENTRIES = `// Every public address, as paths or full URLs. Read again after \`revalidate\` (an hour) or invalidate().
+// Pages in several languages name each other: { loc: "/about", alternates: [{ hreflang: "fr", href: "/fr/a-propos" }] }.
+// More than one kind of page? Give each its own file: sitemaps: { jobs: async () => [...] }.
+async function entries() {
+  return [{ loc: "/" }];
+}`;
+
+/**
+ * The sitemap module for an Express-style server, in the format of the
+ * server's own files. CommonJS loads the package with import(), which every
+ * Node version it supports allows; require() of an ES module needs 20.19.
+ */
+export function nodeModuleSource(format: "cjs" | "esm" | "ts", mount: string): string {
+  const header = `// The sitemap: XML for search engines, a designed page for people, at /sitemap.xml.
+// The theme comes from ./sitemap.manifest.json, which \`${COMMAND}\` rewrites from the frontend this server serves.
+// Docs: https://github.com/maison-gr/sitemap
+//
+// Mount it before any catch-all route:  ${mount}
+// When content changes (a post is published), list it at once:  sitemap.invalidate()`;
+  if (format === "cjs") {
+    return `${header}
+const manifest = require("./sitemap.manifest.json");
+
+${NODE_ENTRIES}
+
+let handler;
+const load = () => (handler ??= import("maisongr-sitemap/node").then(({ sitemap }) => sitemap({ manifest, entries })));
+
+module.exports = async function sitemap(req, res, next) {
+  (await load())(req, res, next);
+};
+module.exports.invalidate = () => handler?.then((h) => h.invalidate());
+`;
+  }
+  return `${header}
+import { readFileSync } from "node:fs";
+import { sitemap as createSitemap } from "maisongr-sitemap/node";
+
+const manifest = JSON.parse(readFileSync(new URL("./sitemap.manifest.json", import.meta.url), "utf8"));
+
+${NODE_ENTRIES.replace("async function entries()", `async function entries()${format === "ts" ? ": Promise<{ loc: string; lastmod?: string | Date }[]>" : ""}`)}
+
+export const sitemap = createSitemap({ manifest, entries });
+export default sitemap;
+`;
+}
