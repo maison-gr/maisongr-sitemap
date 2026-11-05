@@ -99,3 +99,43 @@ export function createUi(write: (s: string) => void, style: Style) {
 }
 
 export type Ui = ReturnType<typeof createUi>;
+
+type Item = { status: "ok" | "warning" | "next" | "info"; text: string; note?: string };
+
+/** One run as data, for `--json`: what a script or an agent reads instead of the lines a person reads. */
+export type Report = {
+  ok: boolean;
+  command?: string;
+  version: string;
+  subject?: string;
+  sections: { heading: string; items: Item[] }[];
+  warnings: number;
+  output?: string;
+  error?: string;
+};
+
+/** The same calls as createUi, kept in a Report instead of written out. */
+export function createRecorder(version: string, command?: string): { ui: Ui; report: Report } {
+  const report: Report = { ok: true, command, version, sections: [], warnings: 0 };
+  const add = (status: Item["status"], text: string, note?: string) => {
+    if (!report.sections.length) report.sections.push({ heading: "", items: [] });
+    report.sections.at(-1)!.items.push(note ? { status, text, note } : { status, text });
+  };
+  const ui: Ui = {
+    ...createUi(() => {}, { color: false, unicode: true }),
+    line: (s = "") => void (report.output = `${report.output ?? ""}${s}\n`),
+    title() {},
+    done() {},
+    subject: (text) => void (report.subject ??= text),
+    heading: (heading) => void report.sections.push({ heading, items: [] }),
+    ok: (text, note) => add("ok", text, note),
+    warn(text, note) {
+      report.warnings++;
+      add("warning", text, note);
+    },
+    next: (text, note) => add("next", text, note),
+    text: (text) => add("info", text),
+    list: (rows) => rows.forEach((r) => add("info", r.path, r.reason)),
+  };
+  return { ui, report };
+}

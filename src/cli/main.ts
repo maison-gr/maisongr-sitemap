@@ -8,19 +8,21 @@ import { LLMS_MARK, llmsText, onePerPage, pageInfo } from "../build/llms.js";
 import { buildNode, clientOf, nodePaths, servedDirs, type ModuleFormat } from "../build/node-build.js";
 import { findSite, sourceFiles } from "../build/project.js";
 import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
+import { ASIDE, dropFromConfig, moveAside, planReplacement, withoutSitemapStep } from "../build/replace.js";
 import { spaRoutes } from "../build/spa-routes.js";
 import { crawl } from "../build/crawl.js";
 import { buildStatic, siteNameOf, writeSitemapFiles } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
-import { createUi, styleFor, type Style, type Ui } from "./ui.js";
+import { createRecorder, createUi, styleFor, type Report, type Style, type Ui } from "./ui.js";
 const HELP = `
   maisongr-sitemap · one sitemap: XML for search engines, a designed page for people
 
   Set up
     maisongr-sitemap init               Detect the site and set the sitemap up
                                         Next.js, Astro, SvelteKit, Nuxt, Express, Vite, static sites
+                                        --replace  take over from another sitemap tool, nothing deleted
     maisongr-sitemap build              Re-read pages, dates and theme (init puts it in your build)
 
   Sites without a server, and other languages
@@ -39,11 +41,16 @@ const HELP = `
                                         Tell Bing and the other IndexNow engines which pages changed
                                         --since <YYYY-MM-DD>  --all  --dry-run  --wait [s]  --sitemap <file|url>
 
+  For AI agents
+    maisongr-sitemap mcp                The commands as tools, over MCP (stdio)
+
   Options
     --site <url>   the address the site is served at     --offline    don't download fonts
     --images       list each page's images               --no-credit  leave out the footer credit
     --lang <code>  the page's language: en or fr (static, crawl; default the site's)
     --no-color     plain text (also NO_COLOR=1)          --version    --help
+    --json         one JSON report on stdout, for scripts and agents
+                   exit codes: 0 done, 1 stopped with a reason, 2 a bug in this tool
 
   Docs: https://github.com/maison-gr/sitemap
 `;
@@ -142,22 +149,60 @@ const dependsOn = (name: string) => {
   return !!(pkg?.dependencies?.[name] || pkg?.devDependencies?.[name]);
 };
 
-/** Stops before anything is written if another file or package already answers /sitemap.xml. */
-function refuseClashes(fw: ServerKind, publicDir: string) {
+/** Why this project can't take the route as it stands: another file or package already answers /sitemap.xml. */
+function clashOf(fw: ServerKind, publicDir: string): string | undefined {
   for (const f of existingRoutes(fw)) {
     if (existsSync(join(root, f)) && !readFileSync(join(root, f), "utf8").includes("maisongr-sitemap")) {
-      fail(`${f.split("\\").join("/")} already serves /sitemap.xml and is not this package's. Move it aside first; nothing was changed.`);
+      return `${f.split("\\").join("/")} already serves /sitemap.xml and is not this package's. Move it aside first; nothing was changed.`;
     }
   }
-  if (existsSync(join(root, publicDir, "sitemap.xml"))) fail(`${publicDir}/sitemap.xml would shadow the route. Remove it first; this replaces it.`);
-  for (const rival of RIVALS[fw.kind].filter(dependsOn)) {
-    fail(
-      rival === "next-sitemap"
-        ? "next-sitemap writes public/sitemap.xml after each build, which would shadow this route.\n" +
-            "Remove it and its postbuild script first. Keep a robots.txt that names /sitemap.xml (app/robots.ts or public/robots.txt)."
-        : `${rival} serves a sitemap of its own. Remove it first, so search engines are given one sitemap, and point robots.txt at /sitemap.xml.`,
+  if (existsSync(join(root, publicDir, "sitemap.xml"))) return `${publicDir}/sitemap.xml would shadow the route. Remove it first; this replaces it.`;
+  const rival = RIVALS[fw.kind].find(dependsOn);
+  if (!rival) return undefined;
+  return rival === "next-sitemap"
+    ? "next-sitemap writes public/sitemap.xml after each build, which would shadow this route.\n" +
+        "Remove it and its postbuild script first. Keep a robots.txt that names /sitemap.xml (app/robots.ts or public/robots.txt)."
+    : `${rival} serves a sitemap of its own. Remove it first, so search engines are given one sitemap, and point robots.txt at /sitemap.xml.`;
+}
+
+const REPLACE_HINT = "Or let init take over, moving those files to .sitemap-replaced/ with nothing deleted:\n  npx maisongr-sitemap init --replace";
+
+/** With --replace: moves the other sitemap aside and stops it running. Packages stay for the person to uninstall, so the lockfile stays true. */
+function replaceSitemap(routes: string[], publicDir: string, rivals: string[]): string[] {
+  const plan = planReplacement(root, routes, publicDir);
+  if (plan.site && !value("site")) args = [...args, "--site", plan.site];
+  u.heading("Replaced");
+  for (const f of plan.files) u.ok(f.split("\\").join("/"), `moved to ${rel(moveAside(root, f))}`);
+  if (plan.scripts.length) {
+    u.ok(
+      "package.json",
+      editScripts((s = {}) => {
+        const out = { ...s };
+        for (const name of plan.scripts) {
+          const kept = withoutSitemapStep(out[name]!);
+          if (kept) out[name] = kept;
+          else delete out[name];
+        }
+        return { scripts: out, note: `sitemap step taken out of: ${plan.scripts.join(", ")}` };
+      }),
     );
   }
+  for (const rival of rivals) {
+    const config = dropFromConfig(root, rival);
+    if (config?.done) u.ok(config.file, `${rival} taken out`);
+    else if (config) u.warn(`${config.file} still loads ${rival}`, "take it out by hand: it isn't written the usual way");
+  }
+  if (plan.files.some((f) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f))) u.warn("Addresses and rules written in code don't carry over", `read them in ${ASIDE}/ and give them through params, entries or exclude`);
+  u.text(`Check the result, then delete ${ASIDE}/. Its files are all there, unchanged.`);
+  return rivals;
+}
+
+/** Stops before anything is written if another file or package already answers /sitemap.xml, unless told to take over. */
+function clearClashes(fw: ServerKind, publicDir: string): string[] {
+  const clash = clashOf(fw, publicDir);
+  if (!clash) return [];
+  if (!flag("replace")) fail(`${clash}\n${REPLACE_HINT}`);
+  return replaceSitemap(existingRoutes(fw), publicDir, RIVALS[fw.kind].filter(dependsOn));
 }
 
 /**
@@ -176,13 +221,13 @@ function robotsHint(fw: ServerKind, publicDir: string, site: string | undefined)
 /** A site that answers requests: the route tells browsers from crawlers at /sitemap.xml. */
 async function initServer(fw: ServerKind) {
   const publicDir = fw.kind === "sveltekit" ? "static" : "public";
-  refuseClashes(fw, publicDir);
+  if (value("site") && !/^https?:\/\//.test(value("site")!)) fail("--site takes the full address: --site https://your.site");
+  const replaced = clearClashes(fw, publicDir);
   const route = join(root, routePath(fw, existsSync(join(root, "tsconfig.json"))));
 
   const routers = fw.kind === "next" ? [fw.appDir && "App Router", fw.pagesDir && "Pages Router"].filter(Boolean).join(" + ") : "";
   u.subject(`${LABEL[fw.kind]} ${fw.version ?? ""}${routers ? ` · ${routers}` : ""}`);
   const given = value("site");
-  if (given && !/^https?:\/\//.test(given)) fail("--site takes the full address: --site https://your.site");
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   printReport(given ? { ...report, site: trimSlashes(given) } : report);
 
@@ -216,6 +261,7 @@ async function initServer(fw: ServerKind) {
 
   u.heading("Next");
   if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install maisongr-sitemap"));
+  for (const rival of replaced) u.next(u.code(`npm uninstall ${rival}`));
   robotsHint(fw, publicDir, given ? trimSlashes(given) : report.site);
   if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
     u.warn("Your middleware must let /sitemap.xml and /_sitemap/ through untouched", "no locale redirect");
@@ -231,13 +277,14 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   if (!site || !/^https?:\/\//.test(site)) {
     fail(`Give the address the site is served at.\n${LABEL[fw.kind]} builds to static files here (${why}), so the sitemap is written into ./${out} after each build, and it needs the site's public address:\n  npx maisongr-sitemap init --site https://your.site`);
   }
-  refuseClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
+  const replaced = clearClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
   u.subject(`${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
   u.heading("Wrote");
   u.ok("package.json", editScripts((s) => withStaticStep(s, out, trimSlashes(site!), BUILD[fw.kind])));
   u.text(`After each build: ./${out}/sitemap.xml for search engines, and the designed page at /sitemap/ for people.`);
   u.heading("Next");
   if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install --save-dev maisongr-sitemap"));
+  for (const rival of replaced) u.next(u.code(`npm uninstall ${rival}`));
   robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", trimSlashes(site!));
   u.next("For the designed page at /sitemap.xml itself, add a server adapter and run init again");
 }
@@ -293,7 +340,10 @@ function initSpa(found: Extract<ReturnType<typeof detect>, { kind: "spa" }>) {
   if (!site || !/^https?:\/\//.test(site)) {
     fail(`Give the address the site is served at.\nThis ${found.name} single-page app is built to ./${found.outDir}; the sitemap is written there after each build, and it needs the site's public address:\n  npx maisongr-sitemap init --site https://your.site`);
   }
-  if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would be overwritten by this one. Remove it first; this replaces it.");
+  if (existsSync(join(root, "public", "sitemap.xml"))) {
+    if (!flag("replace")) fail(`public/sitemap.xml would be overwritten by this one. Remove it first; this replaces it.\n${REPLACE_HINT}`);
+    replaceSitemap([], "public", []);
+  }
   u.subject(`${found.name} · single-page app, built to ./${found.outDir}`);
   const routes = spaRoutes(root);
   u.heading("Found");
@@ -736,34 +786,48 @@ export async function main(
   const plain: Style = { color: false, unicode: true };
   const noColor = args.includes("--no-color");
   const style = noColor ? { ...(streams.style ?? plain), color: false } : (streams.style ?? plain);
-  u = createUi(streams.out, style);
-  const started = Date.now();
   const command = args[0];
+  const recorder = args.includes("--json") ? createRecorder(version(), command) : undefined;
+  u = recorder?.ui ?? createUi(streams.out, style);
+  const finish = (code: number, change: Partial<Report> = {}) => {
+    if (recorder) streams.out(`${JSON.stringify({ ...recorder.report, ...change }, null, 2)}\n`);
+    return code;
+  };
+  const started = Date.now();
   try {
     if (command === "--version" || command === "-v") u.line(version());
     else if (command === undefined || command === "help" || command === "--help" || command === "-h") u.line(HELP);
-    else if (COMMANDS[command]) {
+    else if (command === "mcp") {
+      const { serve } = await import("./mcp.js");
+      await serve(version(), async (argv) => {
+        let out = "";
+        const code = await main([...argv, "--json"], cwd, { out: (s) => (out += s), err: () => {} });
+        return { code, out };
+      });
+    } else if (COMMANDS[command]) {
       // build runs inside every build log, and --stdout prints a file: neither gets a title or a Done line.
       const bare = command === "build" || args.includes("--stdout");
       if (!bare) u.title(version(), command);
       await COMMANDS[command]!();
       if (!bare) u.done(Date.now() - started);
     } else {
-      const near = Object.keys(COMMANDS).find((c) => distance(c, command) <= 2);
+      const near = [...Object.keys(COMMANDS), "mcp"].find((c) => distance(c, command) <= 2);
       fail(`Unknown command "${command}".${near ? `\nDid you mean ${near}?\n  npx maisongr-sitemap ${near}` : ""}\nnpx maisongr-sitemap --help lists them all.`);
     }
-    return 0;
+    return finish(0);
   } catch (error) {
     u.endProgress();
     if (!(error instanceof Exit)) {
       // A bug, not a mistake the person made: say so, with what to report.
-      createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(
+      const message =
         `maisongr-sitemap stopped on an unexpected error: ${(error as Error).message}\n` +
-          `Nothing past this point was written. Please report it, with the command you ran:\n  https://github.com/maison-gr/sitemap/issues`,
-      );
+        `Nothing past this point was written. Please report it, with the command you ran:\n  https://github.com/maison-gr/sitemap/issues`;
+      if (recorder) return finish(2, { ok: false, error: message });
+      createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(message);
       if (process.env.DEBUG) throw error;
       return 2;
     }
+    if (recorder) return finish(1, { ok: false, error: error.message });
     createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(error.message);
     return 1;
   }

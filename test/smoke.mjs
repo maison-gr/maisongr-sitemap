@@ -25,4 +25,14 @@ server.close();
 const version = execFileSync(process.execPath, [fileURLToPath(new URL("../dist/cli/index.js", import.meta.url)), "--version"], { encoding: "utf8" });
 assert.match(version, /^\d+\.\d+\.\d+/);
 
+// The MCP server, over its real transport: one JSON message per line, and nothing else on stdout.
+const mcp = execFileSync(process.execPath, [fileURLToPath(new URL("../dist/cli/index.js", import.meta.url)), "mcp"], {
+  encoding: "utf8",
+  input: [{ id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, { method: "notifications/initialized" }, { id: 2, method: "tools/list" }].map((m) => JSON.stringify({ jsonrpc: "2.0", ...m })).join("\n"),
+});
+const answers = mcp.trim().split("\n").map((l) => JSON.parse(l));
+assert.equal(answers.length, 2);
+assert.equal(answers[0].result.protocolVersion, "2025-06-18");
+assert.ok(answers[1].result.tools.some((t) => t.name === "sitemap_init"));
+
 console.log(`smoke ok on Node ${process.version}`);

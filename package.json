@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Maison GR (https://www.maisongr.com)",
   "homepage": "https://github.com/maison-gr/sitemap#readme",
+  "mcpName": "io.github.maison-gr/sitemap",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maison-gr/sitemap.git"
@@ -54,6 +55,9 @@
   },
   "files": [
     "dist",
+    "skills",
+    "llms.txt",
+    "server.json",
     "README.md",
     "LICENSE"
   ],
@@ -81,7 +85,13 @@
     "image-sitemap",
     "video-sitemap",
     "indexnow",
-    "xslt"
+    "xslt",
+    "xml-sitemap",
+    "sitemap-generator",
+    "vite-plugin",
+    "llms-txt",
+    "mcp",
+    "agent-skill"
   ],
   "devDependencies": {
     "@types/node": "26.6.6",

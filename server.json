@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.maison-gr/sitemap",
+  "description": "Set up a sitemap: XML for search engines, a page in the site's design for people.",
+  "repository": {
+    "url": "https://github.com/maison-gr/sitemap",
+    "source": "github"
+  },
+  "version": "1.5.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "maisongr-sitemap",
+      "version": "1.5.1",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }]
+    }
+  ]
+}
