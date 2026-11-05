@@ -68,12 +68,66 @@ describe("a single-page app's router table", () => {
     expect(detect(root)).toEqual({ kind: "spa", name: "Vue (Vite)", outDir: "dist" });
     expect(spaRoutes(root)).toEqual({
       router: "vue-router",
-      paths: ["/", "/about"],
+      paths: [{ path: "/" }, { path: "/about" }],
       skipped: [
         { path: "/user/:id", reason: "dynamic: list its pages with --add" },
         { path: "/admin", reason: "private page (admin)" },
       ],
     });
+  });
+
+  it("leaves out redirects and the not-found page, and dates each page by its component's file", () => {
+    // AquaDrill's routes: eager and lazy pages, an old address kept as a redirect, and a catch-all 404.
+    const root = project({
+      "package.json": '{"dependencies":{"react-router-dom":"6","vite":"7"}}',
+      "index.html": "<div id=root></div>",
+      "src/pages/Index.tsx": "export default () => null;",
+      "src/pages/Services.tsx": "export default () => null;",
+      "src/pages/Contact.tsx": "export default () => null;",
+      "src/App.tsx": `import { Navigate, Route, Routes } from "react-router-dom";
+        import Index from "./pages/Index";
+        const ServicesPage = lazy(() => import("./pages/Services"));
+        const Contact = React.lazy(() => import("@/pages/Contact"));
+        export const App = () => (
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route
+              path="/contact"
+              element={<Contact />}
+            />
+            <Route path="/about" element={<Navigate to="/aquadrill" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        );`,
+    });
+    git(root, ["init", "-q"], "2026-01-02T10:00:00Z");
+    git(root, ["add", "package.json", "index.html", "src/App.tsx", "src/pages/Index.tsx", "src/pages/Services.tsx", "src/pages/Contact.tsx"], "2026-01-02T10:00:00Z");
+    git(root, ["commit", "-qm", "one"], "2026-01-02T10:00:00Z");
+    writeFileSync(join(root, "src/pages/Services.tsx"), "export default () => 'new';");
+    git(root, ["commit", "-qam", "two"], "2026-03-04T10:00:00Z");
+
+    expect(spaRoutes(root)).toEqual({
+      router: "react-router-dom",
+      paths: [
+        { path: "/", lastmod: "2026-01-02" },
+        { path: "/contact", lastmod: "2026-01-02" },
+        { path: "/services", lastmod: "2026-03-04" },
+      ],
+      skipped: [
+        { path: "/about", reason: "redirect" },
+        { path: "/*", reason: "not-found page" },
+      ],
+    });
+  });
+
+  it("dates a route a prerendered page already lists, and keeps a page's own date", () => {
+    const root = project({ "index.html": "<html lang=fr><title>Accueil | Puits</title></html>" });
+    buildStatic(root, "https://puits.example", { extra: [{ path: "/", lastmod: "2026-02-01" }, { path: "/services", lastmod: "2026-03-01" }, "/contact"] });
+    const xml = readFileSync(join(root, "sitemap.xml"), "utf8");
+    expect(xml).toContain("<loc>https://puits.example/</loc>\n    <lastmod>2026-02-01</lastmod>");
+    expect(xml).toContain("<loc>https://puits.example/services</loc>\n    <lastmod>2026-03-01</lastmod>");
+    expect(xml).toContain("<loc>https://puits.example/contact</loc>\n  </url>");
   });
 
   it("keeps React Router's framework mode out of single-page app handling", () => {

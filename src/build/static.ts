@@ -114,8 +114,8 @@ export type StaticOptions = {
   name?: string;
   credit?: boolean;
   images?: boolean;
-  /** Addresses no HTML file holds: a single-page app's routes, and any given with --add. */
-  extra?: string[];
+  /** Addresses no HTML file holds: a single-page app's routes (dated by their component's file), and any given with --add. */
+  extra?: (string | { path: string; lastmod?: string })[];
   /** Force /about over /about.html, whatever the site's links do. */
   cleanUrls?: boolean;
   /** The page's language. Default the one the home page declares in <html lang>. */
@@ -149,10 +149,15 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
     const lastmod = dates.get(relative(dir, file).split(sep).join("/"));
     entries.push({ ...facts.entry, ...(lastmod ? { lastmod } : {}) });
   }
-  for (const raw of options.extra ?? []) {
+  for (const item of options.extra ?? []) {
+    const { path: raw, lastmod } = typeof item === "string" ? { path: item, lastmod: undefined } : item;
     const path = raw.startsWith("/") ? raw : `/${raw}`;
     const loc = `${base}${path}`;
-    if (!entries.some((e) => e.loc === loc || e.loc === `${loc}/`)) entries.push({ loc });
+    const known = entries.find((e) => e.loc === loc || e.loc === `${loc}/`);
+    // A prerendered page in the build output has no Git date; the route's component file has one.
+    if (known) {
+      if (!known.lastmod && lastmod) known.lastmod = lastmod;
+    } else entries.push({ loc, ...(lastmod ? { lastmod } : {}) });
   }
   entries.sort((a, b) => a.loc.localeCompare(b.loc));
 
