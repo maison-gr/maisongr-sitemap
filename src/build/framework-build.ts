@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import type { Manifest } from "../types.js";
 import { astroRoutes } from "./astro-routes.js";
 import { cssFonts } from "./css-fonts.js";
-import { ASTRO_CONFIGS, configOf, NUXT_CONFIGS, SVELTE_CONFIGS, type Detected } from "./detect.js";
+import { ASTRO_CONFIGS, configOf, NUXT_CONFIGS, readPackage, SVELTE_CONFIGS, type Detected } from "./detect.js";
 import { read, writeManifest, type BuildReport, type ProjectFacts } from "./manifest.js";
 import { nuxtRoutes } from "./nuxt-routes.js";
 import { filesIn, findIcon, findLocales, findName, findSite, sourceFiles, styleBlocks } from "./project.js";
@@ -27,7 +27,51 @@ function localesOf(routes: FoundRoute[], files: string[]): Manifest["locales"] {
   return routes.some((r) => /^\/\[(locale|lang)\]/.test(r.pattern)) ? findLocales(files) : undefined;
 }
 
-const firstMatch = (source: string, ...patterns: RegExp[]) => patterns.map((p) => source.match(p)?.[1]).find(Boolean);
+/** The text inside the array a key holds (`locales: [ … ]`), nested brackets and braces included. */
+function arrayOf(source: string, key: string): string | undefined {
+  const start = source.search(new RegExp(`\\b${key}\\s*:\\s*\\[`));
+  if (start === -1) return undefined;
+  const open = source.indexOf("[", start);
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "[") depth++;
+    else if (source[i] === "]" && --depth === 0) return source.slice(open + 1, i);
+  }
+  return undefined;
+}
+
+/** Language codes from a locales array: plain strings, or objects naming them by `code` (Nuxt) or `path` (Astro). */
+function codesOf(list: string, objectKey: "code" | "path"): string[] {
+  const named = [...list.matchAll(new RegExp(`\\b${objectKey}\\s*:\\s*["']([\\w-]+)["']`, "g"))].map((m) => m[1]!);
+  // Plain strings outside any object, so the codes inside { codes: [...] } are not counted twice.
+  const plain = [...list.replace(/\{[^{}]*\}/g, "").matchAll(/["']([\w-]+)["']/g)].map((m) => m[1]!);
+  return [...new Set([...plain, ...named])];
+}
+
+/** Astro's i18n: one page file per language, in a folder named for it; the default language unprefixed unless prefixDefaultLocale. */
+function astroLocales(config: string): Manifest["locales"] {
+  const i18n = config.slice(Math.max(0, config.search(/\bi18n\s*:/)));
+  const list = config.search(/\bi18n\s*:/) === -1 ? undefined : arrayOf(i18n, "locales");
+  const codes = list ? codesOf(list, "path") : [];
+  if (codes.length < 2) return undefined;
+  const fallback = firstMatch(i18n, /\bdefaultLocale\s*:\s*["']([\w-]+)["']/) ?? codes[0]!;
+  return { list: codes, default: codes.includes(fallback) ? fallback : codes[0]!, folders: true, prefixDefault: /\bprefixDefaultLocale\s*:\s*true\b/.test(i18n) };
+}
+
+/** @nuxtjs/i18n: pages exist once and the module prefixes them; by default (prefix_except_default) not the default language. */
+function nuxtLocales(root: string, config: string): Manifest["locales"] {
+  const pkg = readPackage(root);
+  if (!pkg?.dependencies?.["@nuxtjs/i18n"] && !pkg?.devDependencies?.["@nuxtjs/i18n"]) return undefined;
+  const i18n = config.slice(Math.max(0, config.search(/\bi18n\s*:/)));
+  const list = arrayOf(i18n, "locales");
+  const codes = list ? codesOf(list, "code") : [];
+  const strategy = firstMatch(i18n, /\bstrategy\s*:\s*["']([\w_]+)["']/) ?? "prefix_except_default";
+  if (codes.length < 2 || strategy === "no_prefix") return undefined;
+  const fallback = firstMatch(i18n, /\bdefaultLocale\s*:\s*["']([\w-]+)["']/) ?? codes[0]!;
+  return { list: codes, default: codes.includes(fallback) ? fallback : codes[0]!, prefix: true, prefixDefault: strategy !== "prefix_except_default" };
+}
+
+const firstMatch =(source: string, ...patterns: RegExp[]) => patterns.map((p) => source.match(p)?.[1]).find(Boolean);
 const httpSite = (url: string | undefined) => (url && !/localhost|127\.0\.0\.1|example\.com/.test(url) ? url.replace(/\/+$/, "") : undefined);
 const base = (path: string | undefined) => (path && path !== "/" ? `/${path.replace(/^\/+|\/+$/g, "")}` : undefined);
 
@@ -64,7 +108,7 @@ function astroFacts(root: string, detected: Extract<Server, { kind: "astro" }>):
     site: findSite([]) ?? httpSite(firstMatch(config, /\bsite\s*:\s*["'](https?:\/\/[^"']+)["']/)) ?? findSite(files),
     basePath: base(firstMatch(config, /\bbase\s*:\s*["']([^"']+)["']/)),
     trailingSlash: /\btrailingSlash\s*:\s*["']always["']/.test(config),
-    locales: localesOf(routes, files),
+    locales: localesOf(routes, files) ?? astroLocales(config),
   };
 }
 
@@ -113,7 +157,7 @@ function nuxtFacts(root: string, detected: Extract<Server, { kind: "nuxt" }>): P
     icon: findIcon(root, undefined, publicDir),
     site: findSite([]) ?? httpSite(firstMatch(config, /\bsite\s*:\s*\{[^}]*\burl\s*:\s*["'](https?:\/\/[^"']+)["']/, /\bsiteUrl\s*:\s*["'](https?:\/\/[^"']+)["']/)) ?? findSite(files),
     basePath: base(firstMatch(config, /\bbaseURL\s*:\s*["']([^"']+)["']/)),
-    locales: localesOf(routes, files),
+    locales: localesOf(routes, files) ?? nuxtLocales(root, config),
   };
 }
 

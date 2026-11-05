@@ -155,6 +155,35 @@ describe("building the manifest", () => {
     expect(readFileSync(join(root, "public", manifest.theme.fonts[0].files[0].url), "utf8")).toBe("x");
   });
 
+  it("links an Astro site's language folders, from its i18n config", async () => {
+    const root = project({
+      "package.json": '{"dependencies":{"astro":"7"}}',
+      "astro.config.mjs": `export default defineConfig({ adapter: node(), i18n: { locales: ["en", "fr", { path: "es", codes: ["es", "es-MX"] }], defaultLocale: "en" } });`,
+      "src/pages/index.astro": "",
+      "src/pages/about.astro": "",
+      "src/pages/fr/index.astro": "",
+      "src/pages/fr/about.astro": "",
+      "src/pages/es/about.astro": "",
+    });
+    const { manifest } = await manifestOf(root);
+    expect(manifest.locales).toEqual({ list: ["en", "fr", "es"], default: "en", folders: true, prefixDefault: false });
+    const { expand } = await import("../src/entries.js");
+    const out = await expand(manifest.routes, { site: "https://a.dev", locales: manifest.locales });
+    expect(out.find((e) => e.loc === "https://a.dev/es/about")!.alternates!.map((a) => a.hreflang)).toEqual(["en", "fr", "es", "x-default"]);
+  });
+
+  it("reads @nuxtjs/i18n: codes from locale objects, and its strategy", async () => {
+    const config = (strategy: string) =>
+      project({
+        "package.json": '{"dependencies":{"nuxt":"4","@nuxtjs/i18n":"10"},"scripts":{"build":"nuxt build"}}',
+        "nuxt.config.ts": `export default defineNuxtConfig({ modules: ["@nuxtjs/i18n"], i18n: { locales: [{ code: "en", name: "English" }, { code: "fr", name: "Français" }], defaultLocale: "fr"${strategy} } })`,
+        "app/pages/index.vue": "",
+      });
+    expect((await manifestOf(config(""))).manifest.locales).toEqual({ list: ["en", "fr"], default: "fr", prefix: true, prefixDefault: false });
+    expect((await manifestOf(config(', strategy: "prefix"'))).manifest.locales).toMatchObject({ prefix: true, prefixDefault: true });
+    expect((await manifestOf(config(', strategy: "no_prefix"'))).manifest.locales).toBeUndefined();
+  });
+
   it("reads a SvelteKit app: static/, paths.base, the root layout's tokens and trailingSlash", async () => {
     const root = project({
       "package.json": '{"name":"field-notes","devDependencies":{"@sveltejs/kit":"3","@sveltejs/adapter-node":"6"}}',

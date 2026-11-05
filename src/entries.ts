@@ -180,6 +180,8 @@ function linkFolders(plain: { path: string; entry: Entry }[], locales: Locales, 
     versions.set(tail, [...(versions.get(tail) ?? []), { lang, path, entry }]);
   }
   for (const group of versions.values()) {
+    // In the site's own order of languages, as the [locale] routes list them.
+    group.sort((a, b) => locales.list.indexOf(a.lang) - locales.list.indexOf(b.lang));
     const fallback = group.find((v) => v.lang === locales.default);
     const alternates = [
       ...group.map((v) => ({ hreflang: v.lang, href: url(v.path) })),
