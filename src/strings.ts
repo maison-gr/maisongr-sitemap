@@ -19,8 +19,11 @@ export type Strings = {
   sectionsNav: string;
   noMatch: string;
   empty: string;
+  /** When the newest page last changed: "Updated 5 November 2026". */
+  updated: (date: Date) => string;
   footer: string;
-  credit: string;
+  /** The credit, around the tool's and the studio's links. */
+  credit: (tool: string, studio: string) => string;
   /** For the filter's live count: {shown} and {total} are filled in by the page's script. */
   tally: string;
 };
@@ -41,8 +44,9 @@ const en: Strings = {
   sectionsNav: "Sections",
   noMatch: "No page matches this filter.",
   empty: "No pages are listed yet. They appear here, and in the XML, once the site publishes them.",
-  footer: "Search engines read the XML version of this list.",
-  credit: "Sitemap by",
+  updated: (date) => `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "UTC" }).format(date)}`,
+  footer: "Search engines read the same list as XML.",
+  credit: (tool, studio) => `Made with ${tool}, open source, by ${studio}`,
   tally: "{shown} of {total} pages",
 };
 
@@ -64,8 +68,10 @@ const fr: Strings = {
   sectionsNav: "Sections",
   noMatch: "Aucune page ne correspond à ce filtre.",
   empty: "Aucune page n’est encore listée. Elles apparaîtront ici, et dans le XML, dès que le site les publiera.",
-  footer: "Les moteurs de recherche lisent la version XML de cette liste.",
-  credit: "Plan du site par",
+  // "le 1er novembre", but "le 5 novembre".
+  updated: (date) => `Mis à jour le ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "UTC" }).format(date).replace(/^1 /, "1er ")}`,
+  footer: "Les moteurs de recherche lisent la même liste en XML.",
+  credit: (tool, studio) => `Réalisé avec ${tool}, outil open source de ${studio}`,
   tally: "{shown} sur {total} pages",
 };
 

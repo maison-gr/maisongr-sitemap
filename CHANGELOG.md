@@ -8,6 +8,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 - `maisongr-sitemap/vite`: a Vite plugin that serves the sitemap during `vite dev`, where the build's static step never runs and the app's catch-all route answered `/sitemap.xml` with its 404. It answers `/sitemap.xml`, `/sitemap/` and their files from the router's routes and the source stylesheets, the same files the build writes, and reads the routes again on each request.
 
+### Changed
+
+- The page's footer says when the newest page last changed (« Mis à jour le 5 novembre 2026 »), and the credit names the tool it was made with and links to its source: "Made with maisongr-sitemap, open source, by Maison GR". `credit: false` and `--no-credit` still leave it out.
+
 ### Fixed
 
 - `build` no longer warns about a dynamic route that the route file gives values for, and a route named only in a comment still counts as missing.

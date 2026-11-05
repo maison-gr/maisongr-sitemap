@@ -59,9 +59,19 @@ function sectionsOf(entries: Entry[]): Map<string, Entry[]> {
 
 const titleOf = (section: string, t: Strings) => (section ? `/${decodeURIComponent(section)}/` : t.pagesSection);
 
-function shell(theme: Theme, title: string, body: string, options: PageOptions): string {
+/** The newest of a list's dates, as a Date, or undefined when none is valid. */
+function newestDate(dates: (string | undefined)[]): Date | undefined {
+  const times = dates.map((d) => (d ? Date.parse(d) : NaN)).filter((n) => !Number.isNaN(n));
+  return times.length ? new Date(Math.max(...times)) : undefined;
+}
+
+const TOOL = '<a href="https://github.com/maison-gr/sitemap" rel="noopener">maisongr-sitemap</a>';
+const STUDIO = '<a href="https://www.maisongr.com" rel="noopener">Maison GR</a>';
+
+function shell(theme: Theme, title: string, body: string, options: PageOptions, updated?: Date): string {
   const assets = options.assets ?? ASSETS;
   const t = stringsFor(options.lang);
+  const about = `${updated ? `<span>${esc(t.updated(updated))}</span>` : ""}<span>${esc(t.footer)}</span>`;
   return `<!doctype html>
 <html lang="${esc(t.lang)}">
 <head>
@@ -78,7 +88,7 @@ ${theme.fonts.flatMap((f) => f.files.slice(0, 1)).map((file) => `<link rel="prel
 <main class="page">
 <a class="brand" href="${esc(options.home ?? "/")}">${esc(theme.name)}</a>
 ${body}
-<footer class="foot"><span>${esc(t.footer)}</span>${options.credit !== false ? `<span>${esc(t.credit)} <a href="https://www.maisongr.com" rel="noopener">Maison GR</a></span>` : ""}</footer>
+<footer class="foot"><p class="about">${about}</p>${options.credit !== false ? `<p class="credit">${t.credit(TOOL, STUDIO)}</p>` : ""}</footer>
 </main>
 <script src="${esc(assets.js)}" defer></script>
 </body>
@@ -132,7 +142,7 @@ ${sections.size > 1 && sections.size <= 12 ? `<nav class="jump" aria-label="${es
 ${groups.join("\n")}
 <p class="empty" id="empty" hidden>${esc(t.noMatch)}</p>`;
 
-  return shell(theme, t.title, body, options);
+  return shell(theme, t.title, body, options, newestDate(entries.map((e) => e.lastmod)));
 }
 
 export function indexPage(parts: { loc: string; lastmod?: string; count: number; label?: string }[], theme: Theme, options: PageOptions = {}): string {
@@ -147,7 +157,7 @@ export function indexPage(parts: { loc: string; lastmod?: string; count: number;
 <section class="group" aria-labelledby="parts-h"><header class="group-head"><h2 id="parts-h">${esc(t.filesSection)}</h2><span class="count">${parts.length}</span></header><ol class="rows">
 ${rows}
 </ol></section>`;
-  return shell(theme, t.indexTitle, body, options);
+  return shell(theme, t.indexTitle, body, options, newestDate(parts.map((p) => p.lastmod)));
 }
 
 /** The XML styled with CSS, for browsers that open the sitemap without sending Sec-Fetch-Dest. */
@@ -218,7 +228,10 @@ h2{min-width:0;overflow-wrap:anywhere;font:600 clamp(1.5rem,3.5vw,2.25rem)/1.1 v
 .lang{font:500 .6875rem/1 var(--mono);letter-spacing:.06em;padding:.25rem .5rem;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
 .empty{margin-top:clamp(2rem,5vw,3rem);max-width:44ch;color:var(--muted)}
 .foot{margin-top:4rem;padding-top:1.25rem;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem 1.5rem;font:400 .75rem/1.5 var(--mono);color:var(--muted)}
-.foot a{color:var(--fg)}
+.foot p{margin:0}
+.about span+span::before{content:" · "}
+.foot a{color:var(--fg);text-underline-offset:.2em;white-space:nowrap}
+.foot a:hover{color:var(--accent)}
 @media (max-width:40rem){.row{grid-template-columns:2.5rem minmax(0,1fr) auto}.date{display:none}}
 @media (prefers-reduced-motion:no-preference){.url,.chip,.jump a{transition:color .15s,border-color .15s,background-color .15s}}
 `;

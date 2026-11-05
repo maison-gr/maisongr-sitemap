@@ -292,6 +292,34 @@ describe("createSitemap", () => {
   });
 });
 
+describe("the page's footer", () => {
+  const e = (loc: string, lastmod?: string) => ({ loc: `https://www.example.com${loc}`, ...(lastmod ? { lastmod } : {}) });
+
+  it("says when the newest page changed, in the page's language", async () => {
+    const { urlsetPage, indexPage } = await import("../src/page.js");
+    const list = [e("/", "2026-08-24"), e("/a", "2026-11-05T14:00:00Z"), e("/b")];
+    expect(urlsetPage(list, manifest.theme)).toContain("<span>Updated 5 November 2026</span><span>Search engines read the same list as XML.</span>");
+    expect(urlsetPage(list, manifest.theme, { lang: "fr" })).toContain("<span>Mis à jour le 5 novembre 2026</span>");
+    expect(urlsetPage([e("/", "2026-11-01")], manifest.theme, { lang: "fr" })).toContain("Mis à jour le 1er novembre 2026");
+    expect(indexPage([{ loc: "https://www.example.com/sitemap.xml?part=1", lastmod: "2026-03-02", count: 3 }], manifest.theme)).toContain("Updated 2 March 2026");
+  });
+
+  it("gives no date when no page has one, rather than an invented one", async () => {
+    const { urlsetPage } = await import("../src/page.js");
+    const html = urlsetPage([e("/"), e("/a")], manifest.theme);
+    expect(html).not.toContain("Updated");
+    expect(html).toContain('<p class="about"><span>Search engines read the same list as XML.</span></p>');
+  });
+
+  it("credits the open-source tool and the studio, each a link, unless credit is off", async () => {
+    const { urlsetPage } = await import("../src/page.js");
+    const html = urlsetPage([e("/")], manifest.theme);
+    expect(html).toContain('Made with <a href="https://github.com/maison-gr/sitemap" rel="noopener">maisongr-sitemap</a>, open source, by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a>');
+    expect(urlsetPage([e("/")], manifest.theme, { lang: "fr" })).toContain("maisongr-sitemap</a>, outil open source de <a");
+    expect(urlsetPage([e("/")], manifest.theme, { credit: false })).not.toContain('class="credit"');
+  });
+});
+
 describe("the page's language", () => {
   const french = { ...manifest, locales: { list: ["fr", "en"], default: "fr" } };
 
@@ -302,7 +330,8 @@ describe("the page's language", () => {
     expect(html).toContain("<h1>Toutes les pages d’Example &amp; Co");
     expect(html).toContain('placeholder="Filtrer par adresse"');
     expect(html).toContain('data-t="{shown} sur {total} pages"');
-    expect(html).toContain("Les moteurs de recherche lisent la version XML de cette liste.");
+    expect(html).toContain("Les moteurs de recherche lisent la même liste en XML.");
+    expect(html).toContain("Réalisé avec <a");
     expect(html).not.toMatch(/Every page|Filter by path|Search engines read/);
   });
 
