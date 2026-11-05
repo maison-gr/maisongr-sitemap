@@ -49,7 +49,8 @@ export type ExpandOptions = {
 };
 
 const SEGMENT = /\[\[?(?:\.\.\.)?([^\]]+)\]\]?/g;
-const isDynamic = (part: string) => /^\[.*\]$/.test(part);
+/** A segment with a parameter anywhere in it: "[slug]", and also Astro's "[lang]-[version]". */
+const isDynamic = (part: string) => /\[[^\]]+\]/.test(part);
 
 function fill(pattern: string, row: ParamRow): string | null {
   let missing = false;

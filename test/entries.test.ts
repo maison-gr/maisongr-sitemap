@@ -47,6 +47,13 @@ describe("expand", () => {
     expect(unfilled(routes, { locales })).toEqual(["/blog/[slug]", "/[locale]/docs/[...path]"]);
   });
 
+  it("treats a segment that mixes text and parameters as dynamic", async () => {
+    const routes = [{ pattern: "/docs/[lang]-[version]" }];
+    expect(await expand(routes, { site })).toEqual([]);
+    const out = await expand(routes, { site, params: { "/docs/[lang]-[version]": () => [{ lang: "en", version: "v2" }] } });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/docs/en-v2`]);
+  });
+
   it("lets an optional catch-all be empty", async () => {
     const out = await expand([{ pattern: "/docs/[[...path]]" }], { site, params: { "/docs/[[...path]]": () => [{}, { path: ["a", "b"] }] } });
     expect(out.map((e) => e.loc)).toEqual([`${site}/docs`, `${site}/docs/a/b`]);
