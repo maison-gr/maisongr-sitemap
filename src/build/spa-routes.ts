@@ -161,7 +161,8 @@ function resolveImport(from: string, spec: string): string | undefined {
 
 /** The file a component comes from: import X from "…", import { X } from "…", or X = lazy(() => import("…")). */
 function componentFile(file: string, source: string, name: string): string | undefined {
-  const id = name.replace(/\$/g, "\\$").split(".")[0]!;
+  // Every character that means something in a pattern escaped, whatever the name holds.
+  const id = name.split(".")[0]!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const spec =
     source.match(new RegExp(`import\\s+${id}\\s+from\\s*["'\`]([^"'\`]+)`))?.[1] ??
     source.match(new RegExp(`import\\s*\\{[^}]*\\b${id}\\b[^}]*\\}\\s*from\\s*["'\`]([^"'\`]+)`))?.[1] ??
