@@ -1,4 +1,4 @@
-import { expand, type ExpandOptions, type Locales } from "./entries.js";
+import { dateOf, expand, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
 import { indexXml, MAX_URLS, newest, urlsetXml } from "./xml.js";
@@ -12,7 +12,7 @@ export type SitemapOptions = {
   /** Values for dynamic routes, keyed by pattern: { "/blog/[slug]": async () => [{ slug: "hello" }] }. */
   params?: ExpandOptions["params"];
   /** Addresses no route file describes. */
-  entries?: () => Entry[] | Promise<Entry[]>;
+  entries?: () => EntryInput[] | Promise<EntryInput[]>;
   /** Paths to leave out: exact paths, prefixes ("/drafts/") or patterns. */
   exclude?: (string | RegExp)[];
   trailingSlash?: boolean;
@@ -23,6 +23,9 @@ export type SitemapOptions = {
   /** The "Sitemap by Maison GR" footer line. Default true. */
   credit?: boolean;
 };
+
+/** An address given through `entries`, its date in any form `DateLike` takes. */
+export type EntryInput = Omit<Entry, "lastmod"> & { lastmod?: DateLike };
 
 const VARY = { Vary: "Sec-Fetch-Dest" };
 
@@ -68,7 +71,10 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
       const entries = (async () => {
         const locales = options.locales ?? manifest.locales;
         const fromRoutes = await expand(manifest.routes, { ...options, locales, site });
-        const extra = options.entries ? await options.entries() : [];
+        const extra = (options.entries ? await options.entries() : []).map(({ lastmod, ...e }) => {
+          const day = dateOf(lastmod);
+          return day ? { ...e, lastmod: day } : e;
+        });
         const seen = new Set(fromRoutes.map((e) => e.loc));
         return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc))];
       })();

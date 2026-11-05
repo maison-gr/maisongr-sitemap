@@ -108,6 +108,14 @@ describe("createSitemap", () => {
     expect((await get(flaky)).status).toBe(200);
   });
 
+  it("takes extra entries dated with a Date, as a database returns them", async () => {
+    const dated = createSitemap({
+      manifest: { ...manifest, routes: [], locales: undefined },
+      entries: () => [{ loc: "https://www.example.com/press", lastmod: new Date("2026-10-31T09:00:00Z") }],
+    });
+    expect(await (await get(dated)).text()).toContain("<lastmod>2026-10-31</lastmod>");
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

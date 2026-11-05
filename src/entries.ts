@@ -1,7 +1,27 @@
 import type { Entry, Route } from "./types.js";
 
+/** A date as a site's data usually has it: "2026-11-04", an ISO timestamp, a Date, or milliseconds. */
+export type DateLike = string | Date | number;
+
 /** Values for a dynamic route's segments, e.g. { slug: "hello" }, with its own date if known. */
-export type ParamRow = { lastmod?: string } & Record<string, string | string[] | undefined>;
+export type ParamRow = { lastmod?: DateLike } & Record<string, string | string[] | DateLike | undefined>;
+
+const W3C_DATE = /^(\d{4}-\d{2}-\d{2})(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * A lastmod as YYYY-MM-DD, or undefined when the value is not a real date:
+ * an invalid lastmod makes Search Console reject the whole file.
+ */
+export function dateOf(value: DateLike | undefined | null): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "string") {
+    // The date as written, so a timestamp keeps the day its author meant.
+    const day = value.trim().match(W3C_DATE)?.[1];
+    return day && !Number.isNaN(Date.parse(day)) ? day : undefined;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
+}
 
 export type Locales = {
   /** Every published language, as it appears in the URL. */
@@ -39,7 +59,7 @@ function fill(pattern: string, row: ParamRow): string | null {
       missing = true;
       return "";
     }
-    return (Array.isArray(value) ? value : [value]).map(encodeURIComponent).join("/");
+    return (Array.isArray(value) ? value : [value]).map((v) => encodeURIComponent(String(v))).join("/");
   });
   return missing ? null : path.replace(/\/{2,}/g, "/").replace(/(.)\/$/, "$1") || "/";
 }
@@ -83,7 +103,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     if (!seg || !options.locales) {
       for (const row of rows) {
         const path = fill(pattern, row);
-        if (path && !matches(path, options.exclude ?? [])) out.push({ loc: url(path), lastmod: row.lastmod ?? route.lastmod });
+        if (path && !matches(path, options.exclude ?? [])) out.push({ loc: url(path), lastmod: dateOf(row.lastmod) ?? route.lastmod });
       }
       continue;
     }
@@ -98,7 +118,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
       const own = row[seg];
       const langs = typeof own === "string" ? [own] : list;
       const group = groups.get(tail) ?? [];
-      for (const locale of langs) group.push({ locale, lastmod: row.lastmod ?? route.lastmod });
+      for (const locale of langs) group.push({ locale, lastmod: dateOf(row.lastmod) ?? route.lastmod });
       groups.set(tail, group);
     }
     for (const [tail, versions] of groups) {

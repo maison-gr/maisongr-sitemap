@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expand, unfilled } from "../src/entries.js";
+import { dateOf, expand, unfilled } from "../src/entries.js";
 
 const site = "https://www.example.com";
 
@@ -66,8 +66,31 @@ describe("expand", () => {
     expect(out.map((e) => e.loc)).toEqual([`${site}/a`]);
   });
 
+  it("takes a row's date as a Date, a timestamp or milliseconds, and drops one that is not a date", async () => {
+    const out = await expand([{ pattern: "/blog/[slug]", lastmod: "2026-01-01" }], {
+      site,
+      params: {
+        "/blog/[slug]": () => [
+          { slug: "date", lastmod: new Date("2026-10-31T12:00:00Z") },
+          { slug: "iso", lastmod: "2026-10-30T23:30:00-05:00" },
+          { slug: "ms", lastmod: Date.UTC(2026, 9, 29) },
+          { slug: "junk", lastmod: "last tuesday" },
+        ],
+      },
+    });
+    expect(out.map((e) => e.lastmod)).toEqual(["2026-10-31", "2026-10-30", "2026-10-29", "2026-01-01"]);
+  });
+
   it("adds a trailing slash when the site uses them", async () => {
     const out = await expand([{ pattern: "/" }, { pattern: "/a" }], { site, trailingSlash: true });
     expect(out.map((e) => e.loc)).toEqual([`${site}/`, `${site}/a/`]);
+  });
+});
+
+describe("dateOf", () => {
+  it("keeps W3C dates as the day they name and rejects the rest", () => {
+    expect(dateOf("2026-11-04")).toBe("2026-11-04");
+    expect(dateOf("2026-11-04T08:00:00.000Z")).toBe("2026-11-04");
+    for (const bad of ["2026-13-45", "04/11/2026", "", NaN, new Date("nope"), undefined, null]) expect(dateOf(bad as never)).toBeUndefined();
   });
 });
