@@ -156,12 +156,15 @@ export function paramsPathOf(root: string, appDir: string) {
   return join(root, appDir, "sitemap.xml", ts ? "params.ts" : "params.js");
 }
 
+/** A string literal for generated code, safe whatever a folder is named: no character in it can end the string or the line. */
+const literal = (s: string) => JSON.stringify(s).replace(/[<>\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
 function writeParamsFile(root: string, appDir: string, routes: FoundRoute[]) {
   const file = paramsPathOf(root, appDir);
   const ts = file.endsWith(".ts");
   const lines = routes.map((r) => {
     const spec = toPosix(relative(dirname(file), join(root, r.page!))).replace(/\.(tsx|ts|jsx|js)$/, "");
-    return `  ${JSON.stringify(r.pattern)}: staticParams(() => import(${JSON.stringify(spec.startsWith(".") ? spec : `./${spec}`)})),`;
+    return `  ${literal(r.pattern)}: staticParams(() => import(${literal(spec.startsWith(".") ? spec : `./${spec}`)})),`;
   });
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(

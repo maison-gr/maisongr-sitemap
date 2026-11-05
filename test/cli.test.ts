@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { entryOf } from "../src/build/node-build.js";
 import { main } from "../src/cli/main.js";
 
 const dirs: string[] = [];
@@ -159,6 +160,16 @@ describe("init on a server whose routes live in code", () => {
     "node_modules/@fontsource-variable/fraunces/index.css": "@font-face{font-family:'Fraunces Variable';font-weight:100 900;src:url(./files/fraunces-latin-wght-normal.woff2) format('woff2-variations')}",
     "node_modules/@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2": "wOF2",
   };
+
+  it("finds the entry the start script names after the runner's options, in linear time", () => {
+    const root = project({ "package.json": '{"scripts":{"start":"node --watch -r dotenv/config server/app.js"}}', "server/app.js": "" });
+    expect(entryOf(root)).toBe(join(root, "server/app.js"));
+    // CodeQL js/redos: options and their values once overlapped, so this took exponential time.
+    const slow = project({ "package.json": JSON.stringify({ scripts: { start: `node ${"-- -".repeat(5000)}` } }) });
+    const started = Date.now();
+    expect(entryOf(slow)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(500);
+  });
 
   it("reads the theme from the frontend the server serves, and writes a CommonJS module beside its entry", async () => {
     const root = project(WORKSPACE);

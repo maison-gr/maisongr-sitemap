@@ -32,6 +32,7 @@ Found and fixed by moving four production sites onto the package.
 - `readonly` arrays are accepted for images, videos and `params` values.
 - Route patterns and slashes are read in linear time, including a language type that could backtrack, and the route file is written atomically.
 - A downloaded font is written only when it really is a WOFF2 file.
+- A server's entry is found when its `start` script passes options first (`node -r dotenv/config server.js`), and generated route code escapes every character a folder name could hold.
 
 ## [1.0.0] - 2026-11-04
 

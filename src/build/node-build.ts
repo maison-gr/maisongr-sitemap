@@ -52,7 +52,7 @@ function pathOf(expr: string, file: string, cwd: string, depth = 0): string | nu
   }
   // A constant from the same file: const FRONTEND_DIST = path.join(__dirname, "../../frontend/dist").
   if (/^[A-Za-z_$][\w$]*$/.test(e) && depth < 3) {
-    const def = read(file).match(new RegExp(`\\b(?:const|let|var)\\s+${e.replace(/\$/g, "\\$")}\\s*=\\s*([^;\\n]+)`));
+    const def = read(file).match(new RegExp(`\\b(?:const|let|var)\\s+${e.replace(/[\\$]/g, "\\$&")}\\s*=\\s*([^;\\n]+)`));
     return def ? pathOf(def[1]!, file, cwd, depth + 1) : null;
   }
   return null;
@@ -120,7 +120,10 @@ export function clientOf(root: string, served: string[]): Client | null {
 /** The server's entry file: package.json `main`, the file `start` runs, or a conventional name. */
 export function entryOf(root: string): string | null {
   const pkg = readPackage(root);
-  const fromStart = String(pkg?.scripts?.start ?? "").match(/\b(?:node|tsx|ts-node|bun|nodemon)\s+(?:--?[\w-]+(?:=\S+)?\s+)*([\w./-]+\.[cm]?[jt]s)\b/)?.[1];
+  // Word by word, not one pattern: "node --watch -r dotenv/config src/index.js" names its file after the runner's options.
+  const words = String(pkg?.scripts?.start ?? "").split(/\s+/);
+  const runner = words.findIndex((w) => /^(?:node|tsx|ts-node|bun|nodemon)$/.test(w));
+  const fromStart = runner < 0 ? undefined : words.slice(runner + 1).find((w) => /^[\w./-]+\.[cm]?[jt]s$/.test(w));
   for (const candidate of [pkg?.main, fromStart, ...SERVER_ENTRIES]) {
     if (typeof candidate === "string" && existsSync(join(root, candidate))) return join(root, candidate);
   }
@@ -151,7 +154,7 @@ export type NodeReport = BuildReport & { client: Client | null };
 
 /** Builds the manifest for an Express-style server: no routes of its own, the theme of the frontend it serves. */
 export async function buildNode(root: string, detected: NodeServer, options: { offline?: boolean } = {}): Promise<NodeReport> {
-  const serverFiles = sourceFiles(root).filter((f) => !/[\\/](test|tests|__tests__)[\\/]|\.(test|spec)\.[cm]?[jt]sx?$/.test(f));
+  const serverFiles = sourceFiles(root).filter((f) => !/[\\/](?:test|tests|__tests__)[\\/]/.test(f) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(f));
   const client = clientOf(root, servedDirs(root, serverFiles));
   const paths = nodePaths(root);
   const from = client?.root ?? root;
