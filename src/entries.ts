@@ -4,7 +4,10 @@ import type { Entry, Route } from "./types.js";
 export type DateLike = string | Date | number;
 
 /** Values for a dynamic route's segments, e.g. { slug: "hello" }, with its own date if known. */
-export type ParamRow = { lastmod?: DateLike } & Record<string, string | string[] | DateLike | undefined>;
+export type ParamRow = { lastmod?: DateLike; images?: string[] } & Record<string, string | string[] | DateLike | undefined>;
+
+/** A row's images, when it gives any: the page's own, for the image sitemap. */
+const imagesOf = (row: ParamRow) => (Array.isArray(row.images) && row.images.length ? { images: row.images } : {});
 
 const W3C_DATE = /^(\d{4}-\d{2}-\d{2})(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
 
@@ -122,7 +125,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
       for (const row of rows) {
         const path = fill(pattern, row);
         if (!path || matches(path, options.exclude ?? [])) continue;
-        const entry: Entry = { loc: url(path), lastmod: dateOf(row.lastmod) ?? route.lastmod };
+        const entry: Entry = { loc: url(path), lastmod: dateOf(row.lastmod) ?? route.lastmod, ...imagesOf(row) };
         out.push(entry);
         plain.push({ path, entry });
       }
@@ -132,14 +135,14 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     // One page in several languages: each language version is its own entry,
     // and every version names all the others.
     const { list, default: fallback } = options.locales;
-    const groups = new Map<string, { locale: string; lastmod?: string }[]>();
+    const groups = new Map<string, { locale: string; lastmod?: string; images?: string[] }[]>();
     for (const row of rows) {
       const tail = fill(rest, row);
       if (tail === null) continue;
       const own = row[seg];
       const langs = typeof own === "string" ? [own] : list;
       const group = groups.get(tail) ?? [];
-      for (const locale of langs) group.push({ locale, lastmod: dateOf(row.lastmod) ?? route.lastmod });
+      for (const locale of langs) group.push({ locale, lastmod: dateOf(row.lastmod) ?? route.lastmod, ...imagesOf(row) });
       groups.set(tail, group);
     }
     for (const [tail, versions] of groups) {
@@ -153,7 +156,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
       for (const v of versions) {
         const path = pathOf(v.locale);
         if (matches(path, options.exclude ?? [])) continue;
-        out.push({ loc: url(path), lastmod: v.lastmod, lang: v.locale, alternates: present.length > 1 ? alternates : undefined });
+        out.push({ loc: url(path), lastmod: v.lastmod, lang: v.locale, alternates: present.length > 1 ? alternates : undefined, ...(v.images ? { images: v.images } : {}) });
       }
     }
   }
