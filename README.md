@@ -315,6 +315,13 @@ Run it again whenever content changes, after a deploy or from a daily cron, so t
   - **robots.txt:** creates it, or adds the `Sitemap:` line it lacks, after asking. `--yes` answers for you (in CI, without it, nothing is written). A robots.txt your code writes (`app/robots.ts`) or that names another sitemap is left alone, with what to change.
   - **Verification files:** `--google` writes the HTML file Google Search Console gives you, `--bing` the `BingSiteAuth.xml` Bing Webmaster Tools gives you, `--indexnow` an IndexNow key file (with a new key if you give none). A file already there with other content is never replaced.
 - **Search Console and Bing Webmaster Tools.** Submit `https://your.site/sitemap.xml` once in each, choosing the HTML file method to verify.
+- **llms.txt**, the short Markdown file AI assistants read ([llmstxt.org](https://llmstxt.org)):
+
+  ```sh
+  npx maisongr-sitemap llms --site https://www.example.com --from http://localhost:3000
+  ```
+
+  It reads the sitemap, keeps one version of each page (the one its `x-default` names), and lists each with the title and meta description the page itself gives, by section, under what the home page says the site is. So it says only what your site says. `--from` reads a running or staging copy; without it, the live site. `--stdout` prints it, `--max` caps the pages (default 200). An `llms.txt` you wrote by hand is never replaced. Run it again when content changes.
 - **IndexNow.** Bing, Yandex, Seznam, Naver and the other participating engines take a list of changed addresses directly. After a deploy:
 
   ```sh

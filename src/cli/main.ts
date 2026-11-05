@@ -4,12 +4,13 @@ import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { bingFile, googleFile, indexNowFile, otherSitemap, robotsWithSitemap } from "../build/connect.js";
+import { LLMS_MARK, llmsText, onePerPage, pageInfo } from "../build/llms.js";
 import { buildNode, clientOf, nodePaths, servedDirs, type ModuleFormat } from "../build/node-build.js";
 import { findSite, sourceFiles } from "../build/project.js";
 import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
 import { spaRoutes } from "../build/spa-routes.js";
 import { crawl } from "../build/crawl.js";
-import { buildStatic, writeSitemapFiles } from "../build/static.js";
+import { buildStatic, siteNameOf, writeSitemapFiles } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
@@ -32,6 +33,8 @@ const HELP = `
   Search engines
     maisongr-sitemap connect [--google <file>] [--bing <code>] [--indexnow [key]] [--yes]
                                         robots.txt naming the sitemap (asks first), and the files that verify the site
+    maisongr-sitemap llms [--from <url>] [--out <dir>] [--stdout]
+                                        llms.txt for AI assistants, from the sitemap and each page's own words
     maisongr-sitemap indexnow --site <url> --key <key>
                                         Tell Bing and the other IndexNow engines which pages changed
                                         --since <YYYY-MM-DD>  --all  --dry-run  --wait [s]  --sitemap <file|url>
@@ -549,6 +552,84 @@ async function runConnect() {
   if (key) u.next(`After each deploy: ${u.code(`npx maisongr-sitemap indexnow --site ${base} --key ${key}`)}`, "keep the key: it's in the file's name");
 }
 
+/**
+ * llms.txt from the sitemap: one version of each page, with the title and
+ * description the page itself gives. Reads the site at --from (a local or
+ * staging copy) or at its address, and writes where the site serves files.
+ */
+async function runLlms() {
+  const found = detect(root);
+  const site = value("site") ?? process.env.SITEMAP_SITE_URL ?? findSite(sourceFiles(root));
+  if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at.\n  npx maisongr-sitemap llms --site https://your.site");
+  const base = trimSlashes(site!);
+  const from = trimSlashes(value("from") ?? base);
+  if (!/^https?:\/\//.test(from)) fail("--from takes the address to read the site at, such as http://localhost:3000.");
+  const toStdout = flag("stdout");
+  const out = value("out") ?? publicDirOf(found);
+  if (!toStdout && !out) fail("Name the folder your site serves files from at its root.\n  npx maisongr-sitemap llms --out public --site https://your.site");
+  const max = value("max") ? Number(value("max")) : 200;
+  if (!(max > 0)) fail("--max takes a number of pages: --max 100");
+
+  const local = (url: string) => {
+    const u = new URL(url);
+    return `${from}${u.pathname}${u.search}`;
+  };
+  const getText = async (url: string) => {
+    const res = await fetch(url, { headers: { "user-agent": "maisongr-sitemap llms (+https://github.com/maison-gr/sitemap)" }, signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    return res.text();
+  };
+
+  if (!toStdout) u.subject(`Reading ${from}/sitemap.xml`);
+  let first: string;
+  try {
+    first = await getText(`${from}/sitemap.xml`);
+  } catch (error) {
+    return fail(`${(error as Error).message.startsWith("http") ? (error as Error).message : `${from}/sitemap.xml could not be read`}.\nDeploy first, or read a running copy with --from http://localhost:3000.`);
+  }
+  const parts = readSitemap(first).parts;
+  const xmls = [first, ...(await Promise.all(parts.map((p) => getText(local(p)))))];
+  const urls = [...new Set(xmls.flatMap(onePerPage))].sort((a, b) => new URL(a).pathname.split("/").length - new URL(b).pathname.split("/").length || a.localeCompare(b)).slice(0, max);
+  if (!urls.length) fail(`${from}/sitemap.xml lists no page yet.`);
+
+  // Each page as the site serves it, read a few at a time.
+  const html = new Map<string, string>();
+  let next = 0;
+  let done = 0;
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      while (next < urls.length) {
+        const url = urls[next++]!;
+        html.set(url, await getText(local(url)).catch(() => ""));
+        if (!toStdout) u.progress(`Reading… ${++done} of ${urls.length} pages`);
+      }
+    }),
+  );
+  u.endProgress();
+  const home = html.get(urls.find((url) => new URL(url).pathname.split("/").filter(Boolean).length === 0) ?? urls[0]!) ?? "";
+  const name = value("name") ?? siteNameOf([...html.values()].filter(Boolean), home) ?? new URL(base).hostname;
+  const ordered = urls.map((url) => pageInfo(html.get(url) ?? "", url, name));
+  const description = home ? pageInfo(home, base, name).description : undefined;
+  const text = llmsText({ name, description, pages: ordered });
+  if (toStdout) return void u.line(text.trimEnd());
+
+  u.heading("Found");
+  u.ok(`${plural(ordered.length, "page")}`, urls.length === max ? `the first ${max}, nearest the home page first; raise --max for more` : "one version of each");
+  u.ok(`Name: ${name}`, description ? "description from the home page" : undefined);
+  if (!description) u.warn("The home page has no meta description", "llms.txt starts with it; add one to say what the site is");
+  const missing = ordered.filter((p) => !p.description).length;
+  if (missing) u.warn(`${plural(missing, "page")} without a meta description`, "listed by title alone");
+
+  const file = join(root, out!, "llms.txt");
+  u.heading("Wrote");
+  if (existsSync(file) && !readFileSync(file, "utf8").includes(LLMS_MARK)) {
+    u.warn(`${rel(file)} is already there, written by hand`, "kept as it is: --stdout prints this one to compare or copy");
+  } else {
+    writeFileSync(file, text);
+    u.ok(rel(file), "run it again after content changes, or in your build");
+  }
+}
+
 /** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
 async function sitemapUrls(source: string): Promise<Sitemap["urls"]> {
   const read = async (where: string) => {
@@ -642,10 +723,11 @@ export async function main(
     if (command === "--version" || command === "-v") u.line(version());
     else if (command === undefined || command === "help" || command === "--help" || command === "-h") u.line(HELP);
     else if (COMMANDS[command]) {
-      // build runs inside every build and CI log: its one or two lines stand alone.
-      if (command !== "build") u.title(version(), command);
+      // build runs inside every build log, and --stdout prints a file: neither gets a title or a Done line.
+      const bare = command === "build" || args.includes("--stdout");
+      if (!bare) u.title(version(), command);
       await COMMANDS[command]!();
-      if (command !== "build") u.done(Date.now() - started);
+      if (!bare) u.done(Date.now() - started);
     } else {
       const near = Object.keys(COMMANDS).find((c) => distance(c, command) <= 2);
       fail(`Unknown command "${command}".${near ? `\nDid you mean ${near}?\n  npx maisongr-sitemap ${near}` : ""}\nnpx maisongr-sitemap --help lists them all.`);
@@ -667,7 +749,7 @@ export async function main(
   }
 }
 
-const COMMANDS: Record<string, () => unknown> = { init, build, static: runStatic, crawl: runCrawl, connect: runConnect, indexnow: runIndexNow };
+const COMMANDS: Record<string, () => unknown> = { init, build, static: runStatic, crawl: runCrawl, connect: runConnect, llms: runLlms, indexnow: runIndexNow };
 
 /** How many letters apart two words are, for "did you mean". */
 function distance(a: string, b: string): number {
