@@ -8,15 +8,19 @@
 ![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-1b1a17)
 ![Node 20.9+](https://img.shields.io/badge/node-%E2%89%A520.9-1b1a17)
 
-![The same /sitemap.xml: the XML a crawler gets, and the page people get on three different sites, each in its own design.](.github/assets/hero.png)
-
-<sub>**One address, two answers.** Left: the XML that Google and Bing receive. Right: what a person sees opening the same `/sitemap.xml` in a browser, on three example sites. Each page takes its site's own colours and fonts, with nothing to design.</sub>
+![One address, two answers: at https://your.site/sitemap.xml, Google and Bing get the standard XML sitemap, and a person opening the same address in a browser gets a page in the site's own design.](.github/assets/hero.png)
 
 ```sh
 npx maisongr-sitemap init
 ```
 
 `init` detects your framework, finds your pages, dates each one from Git, reads your theme, and writes one route file. There's nothing to design and nothing to keep in sync.
+
+## It takes your site's design
+
+The page reads your colours, fonts and dark mode from your own stylesheets. The same package, on three example sites:
+
+![The sitemap page on three example sites, an architecture studio, a software company and a nature blog, each in its own colours and fonts.](.github/assets/themes.png)
 
 ## How it compares
 
