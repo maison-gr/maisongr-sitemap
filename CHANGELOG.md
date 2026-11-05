@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@maison-gr/sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [1.0.0] - 2026-11-04
 
@@ -22,7 +22,7 @@ The first release.
   A default language served without a prefix is followed too.
 - The theme read from the site: colour tokens light and dark, with an AA contrast check on secondary text. Fonts from `next/font`, `@font-face`, Fontsource, Astro's Fonts API or Google Fonts, all served from the site's own domain.
 - `basePath`, `trailingSlash` and the site address read from each framework's config.
-- `@maison-gr/sitemap/node` for Express, Connect, Polka and `node:http`, and `createSitemap` for any server that speaks `Request` and `Response`.
+- `maisongr-sitemap/node` for Express, Connect, Polka and `node:http`, and `createSitemap` for any server that speaks `Request` and `Response`.
 - `static <dir>` for static sites: `sitemap.xml` styled with CSS, and the designed page at `/sitemap/`.
 - Sitemap index of `?part=N` files past 50,000 addresses.
 - Named sitemaps (`sitemaps: { companies, jobs }`) served from the same route, under an index.

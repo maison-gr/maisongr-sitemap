@@ -1,7 +1,8 @@
-# @maison-gr/sitemap
+# maisongr-sitemap
 
 **One sitemap, two readers.** Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode, with every address as a link and a filter.
 
+[![npm version](https://img.shields.io/npm/v/maisongr-sitemap?color=1b1a17)](https://www.npmjs.com/package/maisongr-sitemap)
 [![CI](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml/badge.svg)](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-1b1a17)](LICENSE)
 ![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-1b1a17)
@@ -10,14 +11,14 @@
 ![The same /sitemap.xml: the XML a crawler gets, and the page people get on three different sites, each in its own design.](.github/assets/hero.png)
 
 ```sh
-npx @maison-gr/sitemap init
+npx maisongr-sitemap init
 ```
 
 `init` detects your framework, finds your pages, dates each one from Git, reads your theme, and writes one route file. There's nothing to design and nothing to keep in sync.
 
 ## How it compares
 
-| | **@maison-gr/sitemap** | next-sitemap | @astrojs/sitemap |
+| | **maisongr-sitemap** | next-sitemap | @astrojs/sitemap |
 |---|---|---|---|
 | Frameworks | Next.js, Astro, SvelteKit, Nuxt, Express, any `Request`/`Response` server, any static site | Next.js | Astro |
 | What a person sees at `/sitemap.xml` | A page in your site's design | Raw XML | XML styled with your own XSL |
@@ -75,14 +76,14 @@ Each one has been checked on a real production build: Next.js 15 and 16 (with `c
 
 If another file or package already serves `/sitemap.xml` (`next-sitemap`, `@astrojs/sitemap`, `@nuxtjs/sitemap`, a `public/sitemap.xml`), `init` stops and says so, before writing anything.
 
-Then install it: `npm install @maison-gr/sitemap`.
+Then install it: `npm install maisongr-sitemap`.
 
 ## The route
 
 The Next.js route, as `init` writes it:
 
 ```ts
-import { sitemap } from "@maison-gr/sitemap/next";
+import { sitemap } from "maisongr-sitemap/next";
 import manifest from "./manifest.json";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +99,7 @@ export const GET = sitemap({
 
 With Next.js 16's `cacheComponents`, `init` leaves out the `dynamic` line, which that mode refuses. The route stays dynamic because it reads the request.
 
-Astro, SvelteKit and Nuxt routes call `createSitemap` from `@maison-gr/sitemap` with the same options.
+Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` with the same options.
 
 | Option | |
 |---|---|
@@ -172,7 +173,7 @@ Rows from `params` take `images` too.
 A server whose routes live in code has nothing to scan, so you give it the addresses:
 
 ```ts
-import { sitemap } from "@maison-gr/sitemap/node";
+import { sitemap } from "maisongr-sitemap/node";
 
 app.get(
   "/sitemap.xml",
@@ -190,7 +191,7 @@ It follows Express's `originalUrl` when mounted under a path, and its `protocol`
 The handler takes a `Request` and returns a `Response`:
 
 ```ts
-import { createSitemap } from "@maison-gr/sitemap";
+import { createSitemap } from "maisongr-sitemap";
 
 const sitemap = createSitemap({ site: "https://www.example.com", entries: () => [{ loc: "/" }, { loc: "/about" }] });
 
@@ -234,7 +235,7 @@ Rows from `params` and `entries` carry their own dates, from your data.
 A static host can't tell browsers from crawlers, so this writes two things side by side:
 
 ```sh
-npx @maison-gr/sitemap static dist --site https://www.example.com
+npx maisongr-sitemap static dist --site https://www.example.com
 ```
 
 - `sitemap.xml`, styled with CSS, for crawlers;
@@ -272,7 +273,7 @@ With `--images`, each page's `og:image` and `<img>` sources go into an image sit
 
 Node 20.9 or later. No runtime dependencies.
 
-The package is an ES module. A CommonJS project (`require("@maison-gr/sitemap/node")`) needs Node 20.19 or 22.12 or later, which load ES modules through `require`.
+The package is an ES module. A CommonJS project (`require("maisongr-sitemap/node")`) needs Node 20.19 or 22.12 or later, which load ES modules through `require`.
 
 ## License
 

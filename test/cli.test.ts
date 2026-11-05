@@ -141,7 +141,7 @@ describe("init on a server whose routes live in code", () => {
   it("shows the Node adapter instead of scanning", async () => {
     const { code, err } = await run(["init"], project({ "package.json": '{"dependencies":{"express":"5"}}' }));
     expect(code).toBe(1);
-    expect(err).toContain('import { sitemap } from "@maison-gr/sitemap/node"');
+    expect(err).toContain('import { sitemap } from "maisongr-sitemap/node"');
   });
 });
 

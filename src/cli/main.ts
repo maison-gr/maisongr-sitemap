@@ -7,7 +7,7 @@ import { withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
-const HELP = `@maison-gr/sitemap
+const HELP = `maisongr-sitemap
 
   maisongr-sitemap init              Detect the framework (Next.js, Astro, SvelteKit, Nuxt) and set the sitemap up
   maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
@@ -92,7 +92,7 @@ const dependsOn = (name: string) => {
 /** Stops before anything is written if another file or package already answers /sitemap.xml. */
 function refuseClashes(fw: ServerKind, publicDir: string) {
   for (const f of existingRoutes(fw)) {
-    if (existsSync(join(root, f)) && !readFileSync(join(root, f), "utf8").includes("@maison-gr/sitemap")) {
+    if (existsSync(join(root, f)) && !readFileSync(join(root, f), "utf8").includes("maisongr-sitemap")) {
       fail(`${f.split("\\").join("/")} already serves /sitemap.xml and is not this package's. Move it aside first; nothing was changed.`);
     }
   }
@@ -140,7 +140,7 @@ async function initServer(fw: ServerKind) {
   say(`  Build  ${editScripts((s) => withBuildStep(s, BUILD[fw.kind]))}`);
 
   say();
-  if (!dependsOn("@maison-gr/sitemap")) say(`  Next:  npm install @maison-gr/sitemap`);
+  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install maisongr-sitemap`);
   robotsHint(fw, publicDir, report.site);
   if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
     say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
@@ -160,7 +160,7 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   say(`\n${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
   say(`  Build  ${editScripts((s) => withStaticStep(s, out, site!.replace(/\/+$/, ""), BUILD[fw.kind]))}`);
   say(`\n  After each build: ./${out}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
-  if (!dependsOn("@maison-gr/sitemap")) say(`  Next:  npm install --save-dev @maison-gr/sitemap`);
+  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
   robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", site!.replace(/\/+$/, ""));
   say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
 }
@@ -173,7 +173,7 @@ async function init() {
   if (found.kind === "node") {
     fail(
       `${found.name} detected. Its routes live in code, so there is nothing to scan: serve the sitemap with the addresses you have.\n\n` +
-        `  import { sitemap } from "@maison-gr/sitemap/node";\n\n` +
+        `  import { sitemap } from "maisongr-sitemap/node";\n\n` +
         `  app.get("/sitemap.xml", sitemap({\n    site: "https://your.site",\n    entries: async () => [{ loc: "/" }, { loc: "/pricing", lastmod: "2026-11-04" }],\n  }));`,
     );
   }
@@ -193,17 +193,17 @@ async function build() {
   }
   const fw = found as ServerKind;
   if (fw.kind !== "next" && !fw.server) {
-    say(`@maison-gr/sitemap: ${LABEL[fw.kind]} builds static files here; the sitemap is written after the build by \`maisongr-sitemap static\`.`);
+    say(`maisongr-sitemap: ${LABEL[fw.kind]} builds static files here; the sitemap is written after the build by \`maisongr-sitemap static\`.`);
     return;
   }
   const route = existingRoutes(fw).find((f) => existsSync(join(root, f)));
   if (!route) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
   if (fw.kind === "next" && usesCacheComponents(root) && /export\s+const\s+dynamic\b/.test(readFileSync(join(root, route!), "utf8"))) {
-    say(`@maison-gr/sitemap: cacheComponents is on, and it refuses the \`dynamic\` export in ${route!.split("\\").join("/")}. Remove that line: the route stays dynamic without it.`);
+    say(`maisongr-sitemap: cacheComponents is on, and it refuses the \`dynamic\` export in ${route!.split("\\").join("/")}. Remove that line: the route stays dynamic without it.`);
   }
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
-  if (report.rebuilt) say(`@maison-gr/sitemap: ${REBUILT}`);
-  say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(report.manifestPath)}`);
+  if (report.rebuilt) say(`maisongr-sitemap: ${REBUILT}`);
+  say(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(report.manifestPath)}`);
 }
 
 function runStatic() {

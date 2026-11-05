@@ -3,7 +3,7 @@ import { createSitemap, type SitemapOptions } from "./handler.js";
 /**
  * The Next.js App Router route: app/sitemap.xml/route.ts.
  *
- *   import { sitemap } from "@maison-gr/sitemap/next";
+ *   import { sitemap } from "maisongr-sitemap/next";
  *   import manifest from "./manifest.json";
  *
  *   // The answer depends on the request's Sec-Fetch-Dest header.

@@ -53,7 +53,7 @@ export function routeSource(detected: ServerKind, ts: boolean, options: { cacheC
       ? "// The answer depends on the request's Sec-Fetch-Dest header. With cacheComponents, reading the request keeps the route dynamic.\n"
       : `// The answer depends on the request's Sec-Fetch-Dest header, so the route stays dynamic.\nexport const dynamic = "force-dynamic";\n`;
     return `${HEADER("./manifest.json")}
-import { sitemap } from "@maison-gr/sitemap/next";
+import { sitemap } from "maisongr-sitemap/next";
 import manifest from "./manifest.json";
 
 ${dynamic}
@@ -65,7 +65,7 @@ ${PARAMS_HINT(`{ "/blog/[slug]": async () => (await getPosts()).map((p) => ({ sl
   }
   if (detected.kind === "astro") {
     return `${HEADER("../sitemap.manifest.json")}
-${ts ? 'import type { APIRoute } from "astro";\n' : ""}import { createSitemap } from "@maison-gr/sitemap";
+${ts ? 'import type { APIRoute } from "astro";\n' : ""}import { createSitemap } from "maisongr-sitemap";
 import manifest from "../sitemap.manifest.json";
 
 // The answer depends on the request's Sec-Fetch-Dest header, so it is rendered on demand.
@@ -81,7 +81,7 @@ export const GET${ts ? ": APIRoute" : ""} = ({ request }) => sitemap(request);
   }
   if (detected.kind === "sveltekit") {
     return `${HEADER("./manifest.json")}
-import { createSitemap } from "@maison-gr/sitemap";
+import { createSitemap } from "maisongr-sitemap";
 import manifest from "./manifest.json";
 ${ts ? 'import type { RequestHandler } from "./$types";\n' : ""}
 // The answer depends on the request's Sec-Fetch-Dest header, so it is never prerendered.
@@ -96,7 +96,7 @@ export const GET${ts ? ": RequestHandler" : ""} = ({ request }) => sitemap(reque
 `;
   }
   return `${HEADER("../sitemap.manifest.json")}
-import { createSitemap } from "@maison-gr/sitemap";
+import { createSitemap } from "maisongr-sitemap";
 import manifest from "../sitemap.manifest.json";
 
 const sitemap = createSitemap({

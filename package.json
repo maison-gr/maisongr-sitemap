@@ -1,5 +1,5 @@
 {
-  "name": "@maison-gr/sitemap",
+  "name": "maisongr-sitemap",
   "version": "1.0.0",
   "description": "One sitemap, two readers: the XML search engines need, and a page in your site's own design for people. Detects your stack, finds your pages, dates them from Git.",
   "license": "MIT",

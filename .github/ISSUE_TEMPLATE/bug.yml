@@ -19,7 +19,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: "@maison-gr/sitemap version"
+      label: "maisongr-sitemap version"
       description: "`npx maisongr-sitemap --version`"
     validations:
       required: true

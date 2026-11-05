@@ -7,7 +7,7 @@ type NodeRequest = IncomingMessage & { originalUrl?: string; protocol?: string; 
 /**
  * For Express, Connect and plain node:http servers.
  *
- *   import { sitemap } from "@maison-gr/sitemap/node";
+ *   import { sitemap } from "maisongr-sitemap/node";
  *
  *   app.get("/sitemap.xml", sitemap({ site: "https://www.example.com", entries: async () => [...] }));
  *

@@ -65,7 +65,7 @@ function asManifest(value: unknown): Manifest {
   if (value === undefined) return BARE;
   const m = value as Partial<Manifest> | null;
   if (!m || m.version !== 1 || !Array.isArray(m.routes) || !m.theme?.light) {
-    throw new Error("@maison-gr/sitemap: the manifest is missing or from another version. Run `maisongr-sitemap build`.");
+    throw new Error("maisongr-sitemap: the manifest is missing or from another version. Run `maisongr-sitemap build`.");
   }
   return m as Manifest;
 }
@@ -89,7 +89,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
   let cache: { at: number; site: string; groups: Promise<Map<string, Entry[]>> } | undefined;
   const names = Object.keys(options.sitemaps ?? {});
   for (const name of names) {
-    if (name === "pages" || !/^[\w-]+$/.test(name)) throw new Error(`@maison-gr/sitemap: "${name}" can't name a sitemap: use letters, digits, - and _, and not "pages", which the routes use.`);
+    if (name === "pages" || !/^[\w-]+$/.test(name)) throw new Error(`maisongr-sitemap: "${name}" can't name a sitemap: use letters, digits, - and _, and not "pages", which the routes use.`);
   }
 
   /** An address's path as routes and `exclude` write it: without the basePath. */
@@ -104,7 +104,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
     list
       .map(({ lastmod, ...e }) => {
         const loc = e.loc.startsWith("/") ? `${site}${e.loc}` : e.loc;
-        if (!URL.canParse(loc)) throw new Error(`@maison-gr/sitemap: ${from} gave "${e.loc}", which is neither an address nor a path.`);
+        if (!URL.canParse(loc)) throw new Error(`maisongr-sitemap: ${from} gave "${e.loc}", which is neither an address nor a path.`);
         const day = dateOf(lastmod);
         return day ? { ...e, loc, lastmod: day } : { ...e, loc };
       })
