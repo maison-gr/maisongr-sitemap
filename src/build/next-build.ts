@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Manifest } from "../types.js";
 import type { Detected } from "./detect.js";
@@ -51,9 +51,23 @@ export function usesCacheComponents(root: string): boolean {
   return /\b(cacheComponents|dynamicIO)\s*:\s*true\b/.test(src);
 }
 
+const LAYOUTS = ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"];
+
+/**
+ * The layout that sets the site's fonts and name: the root one, or, in an
+ * app with no root layout, the one in a first [lang], [locale] or (group) folder.
+ */
 export function layoutOf(root: string, appDir?: string): string | undefined {
   if (!appDir) return undefined;
-  return ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"].map((n) => join(root, appDir, n)).find(existsSync);
+  const base = join(root, appDir);
+  const own = LAYOUTS.map((n) => join(base, n)).find(existsSync);
+  if (own || !existsSync(base)) return own;
+  for (const dir of readdirSync(base).sort()) {
+    if (!/^(\[(lang|locale)\]|\(.+\))$/.test(dir)) continue;
+    const nested = LAYOUTS.map((n) => join(base, dir, n)).find(existsSync);
+    if (nested) return nested;
+  }
+  return undefined;
 }
 
 export function manifestPathOf(root: string, appDir: string) {
