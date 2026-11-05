@@ -1,0 +1,37 @@
+name: Release
+
+# Publishes to npm when a GitHub release is published, never on a push.
+# Uses npm's trusted publishing: no npm token is stored; npm trusts this
+# workflow (set it up once under the package's settings on npmjs.com, as
+# "Trusted publisher": GitHub Actions, maison-gr/sitemap, release.yml).
+# Packages published this way carry a provenance statement.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install --global npm@11
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build && node test/smoke.mjs
+      # The release's tag must match package.json, so what is published is what was released.
+      - run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm publish --access public
