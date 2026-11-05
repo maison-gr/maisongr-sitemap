@@ -12,10 +12,11 @@ type NodeRequest = IncomingMessage & { originalUrl?: string; protocol?: string; 
  *   app.get("/sitemap.xml", sitemap({ site: "https://www.example.com", entries: async () => [...] }));
  *
  * Errors go to Express's `next` when there is one, and are a plain 500 otherwise.
+ * `invalidate()` drops the cached list, e.g. when a post is published.
  */
 export function sitemap(options: SitemapOptions = {}) {
   const handle = createSitemap(options);
-  return async function sitemapHandler(req: NodeRequest, res: ServerResponse, next?: (error?: unknown) => void): Promise<void> {
+  async function sitemapHandler(req: NodeRequest, res: ServerResponse, next?: (error?: unknown) => void): Promise<void> {
     try {
       const response = await handle(toRequest(req));
       res.statusCode = response.status;
@@ -27,7 +28,8 @@ export function sitemap(options: SitemapOptions = {}) {
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.end("The sitemap could not be built.");
     }
-  };
+  }
+  return Object.assign(sitemapHandler, { invalidate: handle.invalidate });
 }
 
 function toRequest(req: NodeRequest): Request {

@@ -100,6 +100,15 @@ describe("createSitemap", () => {
     expect(calls).toBe(1);
   });
 
+  it("reads them again after invalidate(), so a new post is listed at once", async () => {
+    let slugs = ["first"];
+    const live = createSitemap({ manifest, params: { "/[locale]/blog/[slug]": () => slugs.map((slug) => ({ slug })) } });
+    expect(locs(await (await get(live)).text())).not.toContain("https://www.example.com/en/blog/second");
+    slugs = ["first", "second"];
+    live.invalidate();
+    expect(locs(await (await get(live)).text())).toContain("https://www.example.com/en/blog/second");
+  });
+
   it("tries again after a failed load instead of keeping the failure", async () => {
     let calls = 0;
     const flaky = createSitemap({

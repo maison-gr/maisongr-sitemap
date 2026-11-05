@@ -117,7 +117,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` wi
 | `site` | The address the site is served at. Defaults to the manifest's, then the request's. |
 | `basePath`, `trailingSlash` | Override what was read from your config. |
 | `locales` | Override the detected languages: `{ list, default, prefix?, prefixDefault?, folders? }`. |
-| `revalidate` | Seconds the list is kept before `params` and `entries` run again. Default 3600. A failed load is not kept. |
+| `revalidate` | Seconds the list is kept before `params` and `entries` run again. Default 3600. A failed load is not kept. To list new content at once, call the handler's `invalidate()` when it is published. |
 | `theme` | Override any detected colour, font, name or icon. |
 | `credit` | The "Sitemap by Maison GR" footer line. Default `true`. |
 

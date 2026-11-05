@@ -1,5 +1,5 @@
 import type { ParamRow } from "./entries.js";
-import { createSitemap, type SitemapOptions } from "./handler.js";
+import { createSitemap, type SitemapHandler, type SitemapOptions } from "./handler.js";
 
 /**
  * The Next.js App Router route: app/sitemap.xml/route.ts.
@@ -15,7 +15,7 @@ import { createSitemap, type SitemapOptions } from "./handler.js";
  * `dynamic` is written out in the route file because Next reads it from the
  * source. The list of addresses is cached in memory (see `revalidate`).
  */
-export function sitemap(options: SitemapOptions): (request: Request) => Promise<Response> {
+export function sitemap(options: SitemapOptions): SitemapHandler {
   return createSitemap(options);
 }
 
@@ -38,4 +38,4 @@ export function staticParams(load: () => Promise<{ generateStaticParams?: (...ar
   };
 }
 
-export type { SitemapOptions };
+export type { SitemapHandler, SitemapOptions };

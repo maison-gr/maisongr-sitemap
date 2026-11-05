@@ -46,6 +46,13 @@ export type SitemapOptions = {
 /** An address given through `entries`, its date in any form `DateLike` takes. */
 export type EntryInput = Omit<Entry, "lastmod"> & { lastmod?: DateLike };
 
+/**
+ * The sitemap's request handler. `invalidate()` drops the cached list, so the
+ * next request reads `params`, `entries` and `sitemaps` again: call it when
+ * the content changes (a post is published) rather than waiting for `revalidate`.
+ */
+export type SitemapHandler = ((request: Request) => Promise<Response>) & { invalidate(): void };
+
 const VARY = { Vary: "Sec-Fetch-Dest" };
 
 function respond(body: string, type: string, headers: Record<string, string> = {}) {
@@ -85,7 +92,7 @@ const hostOf = (site: string) => new URL(site).hostname.replace(/^www\./, "");
  * file presented two ways, not cloaking); the page is noindex, and Vary keeps
  * any cache from handing one to the other.
  */
-export function createSitemap(options: SitemapOptions = {}): (request: Request) => Promise<Response> {
+export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
   const manifest = asManifest(options.manifest);
   const theme = mergeTheme(manifest.theme, options.theme);
   const ttl = (options.revalidate ?? 3600) * 1000;
@@ -162,7 +169,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
     return chunks.length ? chunks : [[]];
   };
 
-  return async function GET(request: Request): Promise<Response> {
+  async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const asset = url.searchParams.get("asset");
     if (asset === "page.css") return respond(pageCss(theme), "text/css", { "Cache-Control": "public, max-age=86400" });
@@ -224,5 +231,8 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
     if (!entries) return notFound();
     const chunk = chunksOf(entries)[Math.max(part, 1) - 1];
     return chunk ? urlset(chunk) : notFound();
-  };
+  }
+
+  // The last good list stays, for a load that fails after it.
+  return Object.assign(GET, { invalidate: () => void (cache = undefined) });
 }
