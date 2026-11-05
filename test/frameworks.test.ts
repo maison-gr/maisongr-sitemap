@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { astroRoutes } from "../src/build/astro-routes.js";
+import { detect } from "../src/build/detect.js";
+import { buildFramework } from "../src/build/framework-build.js";
 import { nuxtRoutes } from "../src/build/nuxt-routes.js";
 import { svelteRoutes } from "../src/build/svelte-routes.js";
 
@@ -119,5 +121,78 @@ describe("Nuxt routes", () => {
       "app/pages/beta.vue": '<script setup>import { noindexMeta } from "~/utils/seo"; noindexMeta();</script>',
     });
     expect(patterns(nuxtRoutes(root, "app/pages"))).toEqual(["/"]);
+  });
+});
+
+const manifestOf = async (root: string) => {
+  const report = await buildFramework(root, detect(root) as never, { offline: true });
+  return { report, manifest: JSON.parse(readFileSync(report.manifestPath, "utf8")) };
+};
+
+describe("building the manifest", () => {
+  it("reads an Astro site: config, layout title, global CSS and its fonts", async () => {
+    const root = project({
+      "package.json": '{"name":"atelier","dependencies":{"astro":"7","@astrojs/node":"10"}}',
+      "astro.config.mjs": `export default defineConfig({ site: "https://www.atelier.dev", base: "/studio", trailingSlash: "always", adapter: node({ mode: "standalone" }) });`,
+      "src/layouts/Base.astro": "<html><head><title>Atelier | Studio</title></head><style is:global>:root { --background: #f7f5f0; --foreground: #121212; }</style></html>",
+      "src/styles/global.css": `@font-face { font-family: "Atelier Sans"; src: url("./fonts/sans.woff2"); } body { font-family: "Atelier Sans", sans-serif; }`,
+      "src/styles/fonts/sans.woff2": "x",
+      "src/pages/index.astro": "",
+      "src/pages/work/[slug].astro": "",
+      "public/favicon.svg": "<svg/>",
+    });
+    const { report, manifest } = await manifestOf(root);
+    expect(report.manifestPath).toBe(join(root, "src", "sitemap.manifest.json"));
+    expect(manifest).toMatchObject({
+      framework: "astro",
+      site: "https://www.atelier.dev",
+      basePath: "/studio",
+      trailingSlash: true,
+      routes: [{ pattern: "/" }, { pattern: "/work/[slug]" }],
+      theme: { name: "Atelier", icon: "/favicon.svg", light: { background: "#f7f5f0", foreground: "#121212" }, fonts: [{ family: "Atelier Sans", role: "body" }] },
+    });
+    expect(report.needParams).toEqual(["/work/[slug]"]);
+    expect(readFileSync(join(root, "public", manifest.theme.fonts[0].files[0].url), "utf8")).toBe("x");
+  });
+
+  it("reads a SvelteKit app: static/, paths.base, the root layout's tokens and trailingSlash", async () => {
+    const root = project({
+      "package.json": '{"name":"field-notes","devDependencies":{"@sveltejs/kit":"3","@sveltejs/adapter-node":"6"}}',
+      "vite.config.ts": `export default defineConfig({ plugins: [sveltekit({ adapter: adapter(), paths: { base: "/notes" } })] });`,
+      "src/app.html": "<html><head>%sveltekit.head%</head></html>",
+      "src/routes/+layout.svelte": "<style>:global(:root) { --bg: #fffdf8; --fg: #1d1b16; --accent: #c2410c; }</style>",
+      "src/routes/+layout.ts": "export const trailingSlash = 'always';",
+      "src/routes/+page.svelte": "",
+      "src/routes/[lang]/guide/+page.svelte": "",
+      "src/lib/i18n.ts": 'export const LOCALES = ["en", "fr"];',
+      "static/favicon.png": "x",
+    });
+    const { report, manifest } = await manifestOf(root);
+    expect(report.manifestPath).toBe(join(root, "src", "routes", "sitemap.xml", "manifest.json"));
+    expect(manifest).toMatchObject({
+      framework: "sveltekit",
+      basePath: "/notes",
+      trailingSlash: true,
+      locales: { list: ["en", "fr"], default: "en" },
+      theme: { name: "Field Notes", icon: "/favicon.png", light: { background: "#fffdf8", foreground: "#1d1b16", accent: "#c2410c" } },
+    });
+  });
+
+  it("reads a Nuxt app: app/ as srcDir, baseURL, site.url, and app.vue alone as one page", async () => {
+    const root = project({
+      "package.json": '{"name":"harbour","dependencies":{"nuxt":"4"},"scripts":{"build":"nuxt build"}}',
+      "nuxt.config.ts": `export default defineNuxtConfig({ app: { baseURL: "/harbour/", head: { title: "Harbour" } }, site: { url: "https://harbour.app" } })`,
+      "app/app.vue": "<template><NuxtPage /></template><style>:root { --color-background: #0f1115; --color-foreground: #e6e6e6 }</style>",
+      "app/assets/css/main.css": ".dark { --color-background: #000; --color-foreground: #fff }",
+    });
+    const { report, manifest } = await manifestOf(root);
+    expect(report.manifestPath).toBe(join(root, "server", "sitemap.manifest.json"));
+    expect(manifest).toMatchObject({
+      framework: "nuxt",
+      site: "https://harbour.app",
+      basePath: "/harbour",
+      routes: [{ pattern: "/" }],
+      theme: { name: "Harbour", light: { background: "#0f1115" }, dark: { background: "#000" } },
+    });
   });
 });

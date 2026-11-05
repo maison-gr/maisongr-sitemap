@@ -51,7 +51,7 @@ export function findLocales(files: string[]): { list: string[]; default: string 
 
 /** The address the site is served at: metadataBase, a SITE_URL constant, or the environment. */
 export function findSite(files: string[]): string | undefined {
-  const env = process.env.SITEMAP_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;
+  const env = process.env.SITEMAP_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL ?? process.env.NUXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;
   if (env && /^https?:\/\//.test(env)) return env.replace(/\/+$/, "");
   for (const f of files) {
     const src = read(f);
@@ -68,6 +68,7 @@ export function findName(root: string, layoutSource: string): string {
   const m =
     layoutSource.match(/siteName\s*:\s*["']([^"']+)["']/) ??
     layoutSource.match(/applicationName\s*:\s*["']([^"']+)["']/) ??
+    layoutSource.match(/<title>\s*([^<{|·—–-]+?)\s*(?:[|·—–-][^<]*)?<\/title>/) ??
     layoutSource.match(/title\s*:\s*\{[^}]*default\s*:\s*["']([^"'|·—–-]+)/) ??
     layoutSource.match(/title\s*:\s*["']([^"'|·—–-]+)/);
   if (m) return m[1]!.trim();
@@ -75,13 +76,35 @@ export function findName(root: string, layoutSource: string): string {
   return name.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** The icon path the site serves, if it has one. */
-export function findIcon(root: string, appDir?: string): string | undefined {
+/** The icon path the site serves, if it has one: Next.js app/icon.*, or a favicon in the public directory. */
+export function findIcon(root: string, appDir?: string, publicDir = join(root, "public")): string | undefined {
   const app = appDir ? join(root, appDir) : null;
   for (const n of ["icon.svg", "icon.png", "favicon.ico"]) if (app && existsSync(join(app, n))) return `/${n}`;
-  for (const n of ["favicon.svg", "icon.svg", "favicon.ico", "favicon.png"]) if (existsSync(join(root, "public", n))) return `/${n}`;
+  for (const n of ["favicon.svg", "icon.svg", "favicon.ico", "favicon.png"]) if (existsSync(join(publicDir, n))) return `/${n}`;
   return undefined;
 }
+
+/** Files under one directory of the project whose names pass `test`, sorted, bounded so a large repo stays fast. */
+export function filesIn(root: string, dir: string, test: RegExp, limit = 2000): string[] {
+  const out: string[] = [];
+  const walk = (d: string) => {
+    if (!existsSync(d)) return;
+    for (const n of readdirSync(d).sort()) {
+      if (out.length >= limit) return;
+      if (IGNORE.has(n) || n.startsWith(".")) continue;
+      const full = join(d, n);
+      const s = statSync(full);
+      if (s.isDirectory()) walk(full);
+      else if (test.test(n) && s.size < 512 * 1024) out.push(full);
+    }
+  };
+  walk(join(root, dir));
+  return out;
+}
+
+/** The CSS inside a component's <style> blocks, with Svelte's :global(:root) unwrapped so tokens read as global. */
+export const styleBlocks = (source: string) =>
+  [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]!.replace(/:global\(([^()]*)\)/g, "$1")).join("\n");
 
 /** The stylesheets the root layout imports, plus the conventional global ones. */
 export function cssFiles(root: string, layoutFile?: string): string[] {

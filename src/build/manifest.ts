@@ -31,6 +31,8 @@ export type ProjectFacts = {
   skipped: Skipped[];
   /** The site's stylesheets, entry points first. */
   stylesheets: string[];
+  /** CSS from components' <style> blocks (Astro, Svelte, Vue layouts), read before the stylesheets. */
+  inlineStyles?: string[];
   fonts: FontSource[];
   /** Where files the site serves from its root live (public/, static/). */
   publicDir: string;
@@ -94,7 +96,7 @@ export async function writeManifest(root: string, facts: ProjectFacts, options: 
     })
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 
-  const css = facts.stylesheets.map((f) => withImports(f)).join("\n");
+  const css = [...(facts.inlineStyles ?? []), ...facts.stylesheets.map((f) => withImports(f))].join("\n");
   const { light, dark } = scopes(blocks(css));
   const darkPalette = dark.size ? palette(dark, light) : null;
   const { fonts, missed } = await materialize(facts.fonts.filter((s) => !NON_LATIN.test(s.family)), facts.publicDir, options.offline);
