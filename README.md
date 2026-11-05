@@ -90,7 +90,7 @@ It reads the built HTML, so each page's language and `hreflang` links come from 
 
 `0.1`: Next.js, plus static mode, which covers any framework's static build. Astro, SvelteKit, Nuxt and Express adapters are next. `init` recognises them already and points to static mode for now.
 
-Zero runtime dependencies. Node 18.18 or later.
+Zero runtime dependencies. Node 20.9 or later.
 
 ## License
 
