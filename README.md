@@ -84,6 +84,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `@maison-gr/sitemap` 
 | `manifest` | What the build step wrote. Without one, the sitemap lists `entries` alone, in a neutral theme. |
 | `params` | Values for dynamic routes, keyed by the route as the build report names it (`"/blog/[slug]"`). Each row may carry its own `lastmod` and `images`. |
 | `entries` | Extra addresses no route file describes. A `loc` may be a path (`"/press"`). Each may carry `images`, `videos` and `news`. |
+| `sitemaps` | More sitemaps, by name (see [Several sitemaps](#several-sitemaps)). |
 | `exclude` | Paths to leave out, from routes and `entries` alike: exact (`"/thanks"`), prefix (`"/drafts/"`) or `RegExp`. |
 | `site` | The address the site is served at. Defaults to the manifest's, then the request's. |
 | `basePath`, `trailingSlash` | Override what was read from your config. |
@@ -97,6 +98,26 @@ A `lastmod` can be a `YYYY-MM-DD` string, an ISO timestamp, a `Date` or millisec
 Past 50,000 addresses, the sitemap becomes a sitemap index of `?part=N` files.
 
 There is no `changefreq` or `priority`: Google says it ignores both.
+
+## Several sitemaps
+
+A large site often keeps one sitemap per kind of page, so Search Console reports on each separately:
+
+```ts
+sitemap({
+  manifest,
+  sitemaps: {
+    companies: async () => (await db.companies()).map((c) => ({ loc: `/c/${c.slug}`, lastmod: c.updatedAt })),
+    jobs: async () => (await db.jobs()).map((j) => ({ loc: `/jobs/${j.id}`, lastmod: j.updatedAt })),
+  },
+});
+```
+
+`/sitemap.xml` then becomes their index:
+- `?sitemap=pages`, for the routes and `entries`;
+- then `?sitemap=companies` and `?sitemap=jobs`.
+
+Each one still splits into parts past 50,000 addresses. An address is listed once, in the first sitemap that has it. Opened in a browser, the index is a page that links to each sitemap.
 
 ## Images, videos and news
 
