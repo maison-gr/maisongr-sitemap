@@ -103,6 +103,8 @@ export const GET = sitemap({
 });
 ```
 
+A dynamic page that exports `generateStaticParams` needs no `params` entry: the route lists the values that function returns.
+
 With Next.js 16's `cacheComponents`, `init` leaves out the `dynamic` line, which that mode refuses. The route stays dynamic because it reads the request.
 
 Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` with the same options.
@@ -114,6 +116,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` wi
 | `entries` | Extra addresses no route file describes. A `loc` may be a path (`"/press"`). Each may carry `images`, `videos` and `news`. |
 | `sitemaps` | More sitemaps, by name (see [Several sitemaps](#several-sitemaps)). |
 | `exclude` | Paths to leave out, from routes and `entries` alike: exact (`"/thanks"`), prefix (`"/drafts/"`) or `RegExp`. |
+| `transform` | Called with each entry before it's listed. Return it changed (to add `images`, say) or `null` to leave it out. |
 | `site` | The address the site is served at. Defaults to the manifest's, then the request's. |
 | `basePath`, `trailingSlash` | Override what was read from your config. |
 | `locales` | Override the detected languages: `{ list, default, prefix?, prefixDefault?, folders? }`. |
@@ -283,6 +286,7 @@ With `--images`, each page's `og:image` and `<img>` sources go into an image sit
   - `--since 2026-11-01` picks the date.
   - `--all` sends everything.
   - `--dry-run` lists the addresses without sending them.
+  - `--wait` waits up to 180 seconds (or the number you give) for a fresh deploy to serve the key.
 
   The key is yours to choose: 8 to 128 letters, digits or dashes. The site must serve it at `/<key>.txt`, and the command checks that before it sends anything.
 

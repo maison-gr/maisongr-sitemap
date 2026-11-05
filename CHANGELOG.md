@@ -2,6 +2,37 @@
 
 All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-05
+
+Found and fixed by moving four production sites onto the package.
+
+### Added
+
+- Next.js dynamic pages are listed from their own `generateStaticParams`, with no `params` entry.
+- `transform` option: change each entry before it's listed, or return `null` to leave it out.
+- `invalidate()` on the handler, so new content is listed at once instead of when `revalidate` runs out.
+- Regional `hreflang` codes the pages declare, such as `fr-CA` and `en-CA`.
+- `init` and `build` for Express: they follow `express.static(...)` to the frontend and read its theme, write `sitemap.js` as CommonJS or ESM to match the server, and flag an old sitemap route left in it.
+- Languages declared as a TypeScript type, and a layout found under `[lang]` when there is no root layout.
+- Pages that only redirect or answer not found, and pages the middleware keeps for signed-in visitors, are left out.
+- Fontsource packages hoisted to a workspace's root are found, and font roles are read from a Tailwind config.
+- `indexnow --wait`, for a deploy that isn't serving the key yet, and an explanation when an engine answers 403.
+
+### Changed
+
+- Empty sitemaps are left out of the index.
+- When a load fails, the last good list is served instead of an error.
+
+### Fixed
+
+- A language version given as a path (`"/fr/a-propos"`) is written as a full address, not a relative one.
+- A catch-all's value given as a string keeps its slashes instead of becoming `%2F`.
+- Secondary text tokens such as `--color-text-2` are recognised, and so is a site address written as `process.env.SITE_URL || "https://…"`.
+- A local font is named after its file, not its CSS variable.
+- `readonly` arrays are accepted for images, videos and `params` values.
+- Route patterns and slashes are read in linear time, including a language type that could backtrack, and the route file is written atomically.
+- A downloaded font is written only when it really is a WOFF2 file.
+
 ## [1.0.0] - 2026-11-04
 
 The first release.
@@ -31,4 +62,5 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.1.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.0.0
