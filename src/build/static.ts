@@ -1,5 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { trimSlashes } from "../entries.js";
 import { PAGE_JS, pageCss, urlsetPage, xmlCss } from "../page.js";
 import type { Entry, Font, Theme } from "../types.js";
 import { urlsetXml } from "../xml.js";
@@ -60,7 +61,7 @@ function imagesIn(html: string, pageUrl: string): string[] {
 }
 
 export function buildStatic(dir: string, site: string, options: { name?: string; credit?: boolean; images?: boolean } = {}): StaticReport {
-  const base = site.replace(/\/+$/, "");
+  const base = trimSlashes(site);
   const files = walk(dir);
   const skipped: StaticReport["skipped"] = [];
   const entries: Entry[] = [];

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
+import { trimSlashes } from "../entries.js";
 import type { Manifest } from "../types.js";
 import { astroRoutes } from "./astro-routes.js";
 import { cssFonts } from "./css-fonts.js";
@@ -72,7 +73,7 @@ function nuxtLocales(root: string, config: string): Manifest["locales"] {
 }
 
 const firstMatch =(source: string, ...patterns: RegExp[]) => patterns.map((p) => source.match(p)?.[1]).find(Boolean);
-const httpSite = (url: string | undefined) => (url && !/localhost|127\.0\.0\.1|example\.com/.test(url) ? url.replace(/\/+$/, "") : undefined);
+const httpSite = (url: string | undefined) => (url && !/localhost|127\.0\.0\.1|example\.com/.test(url) ? trimSlashes(url) : undefined);
 const base = (path: string | undefined) => (path && path !== "/" ? `/${path.replace(/^\/+|\/+$/g, "")}` : undefined);
 
 /** The facts every framework shares: stylesheets and fonts from its source directories. */

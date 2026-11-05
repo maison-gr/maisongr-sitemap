@@ -1,4 +1,4 @@
-import { dateOf, expand, linkFolders, matches, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
+import { dateOf, expand, linkFolders, matches, trimSlashes, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
 import { DEFAULT_PALETTE } from "./build/palette.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
@@ -84,7 +84,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
   const theme = mergeTheme(manifest.theme, options.theme);
   const ttl = (options.revalidate ?? 3600) * 1000;
   const trailingSlash = options.trailingSlash ?? manifest.trailingSlash;
-  const basePath = (options.basePath ?? manifest.basePath)?.replace(/\/+$/, "") || undefined;
+  const basePath = trimSlashes(options.basePath ?? manifest.basePath ?? "") || undefined;
   const page = { credit: options.credit, home: basePath || "/" };
   let cache: { at: number; site: string; groups: Promise<Map<string, Entry[]>> } | undefined;
   const names = Object.keys(options.sitemaps ?? {});
@@ -152,7 +152,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
     if (asset === "page.js") return respond(PAGE_JS, "text/javascript", { "Cache-Control": "public, max-age=86400" });
     if (asset === "xml.css") return respond(xmlCss(theme), "text/css", { "Cache-Control": "public, max-age=86400" });
 
-    const site = (options.site ?? manifest.site ?? url.origin).replace(/\/+$/, "");
+    const site = trimSlashes(options.site ?? manifest.site ?? url.origin);
     const groups = await load(site);
     const named = theme.name ? theme : { ...theme, name: hostOf(site) };
     const browser = request.headers.get("sec-fetch-dest") === "document";

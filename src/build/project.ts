@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { trimSlashes } from "../entries.js";
 import { readPackage } from "./detect.js";
 
 const IGNORE = new Set(["node_modules", ".next", ".git", "dist", "out", "build", ".turbo", ".vercel", "coverage", "public"]);
@@ -52,13 +53,13 @@ export function findLocales(files: string[]): { list: string[]; default: string 
 /** The address the site is served at: metadataBase, a SITE_URL constant, or the environment. */
 export function findSite(files: string[]): string | undefined {
   const env = process.env.SITEMAP_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL ?? process.env.NUXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;
-  if (env && /^https?:\/\//.test(env)) return env.replace(/\/+$/, "");
+  if (env && /^https?:\/\//.test(env)) return trimSlashes(env);
   for (const f of files) {
     const src = read(f);
     const m =
       src.match(/metadataBase\s*:\s*new\s+URL\(\s*["'](https?:\/\/[^"']+)["']/) ??
       src.match(/\b(?:SITE_URL|SITE_ORIGIN|BASE_URL|siteUrl)\s*(?::[^=]+)?=\s*["'](https?:\/\/[^"']+)["']/);
-    if (m && !/localhost|127\.0\.0\.1|example\.com/.test(m[1]!)) return m[1]!.replace(/\/+$/, "");
+    if (m && !/localhost|127\.0\.0\.1|example\.com/.test(m[1]!)) return trimSlashes(m[1]!);
   }
   return undefined;
 }

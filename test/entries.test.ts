@@ -156,6 +156,25 @@ describe("basePath", () => {
   });
 });
 
+describe("input built to be slow", () => {
+  it("trims trailing slashes in linear time", async () => {
+    const { trimSlashes } = await import("../src/entries.js");
+    expect(trimSlashes("https://a.dev///")).toBe("https://a.dev");
+    expect(trimSlashes("///")).toBe("");
+    const start = performance.now();
+    trimSlashes(`${"/".repeat(100_000)}x`);
+    await expand([{ pattern: "/" }], { site: `https://a.dev${"/".repeat(100_000)}x` });
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("reads a route pattern full of brackets in linear time", async () => {
+    const start = performance.now();
+    await expand([{ pattern: `/${"[".repeat(100_000)}` }, { pattern: `/[${"[\\".repeat(50_000)}` }], { site });
+    expect(unfilled([{ pattern: `/${"[".repeat(100_000)}` }], {})).toEqual([]);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
 describe("dateOf", () => {
   it("keeps W3C dates as the day they name and rejects the rest", () => {
     expect(dateOf("2026-11-04")).toBe("2026-11-04");

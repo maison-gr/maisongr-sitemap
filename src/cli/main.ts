@@ -5,6 +5,7 @@ import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
+import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
 const HELP = `maisongr-sitemap
@@ -130,9 +131,12 @@ async function initServer(fw: ServerKind) {
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   printReport(report);
 
-  if (!existsSync(route)) {
-    mkdirSync(dirname(route), { recursive: true });
-    writeFileSync(route, routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) }));
+  // "wx" creates the route only if it isn't there, in one step: no gap between checking and writing.
+  mkdirSync(dirname(route), { recursive: true });
+  try {
+    writeFileSync(route, routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) }), { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
   say(`\n  Wrote  ${rel(route)}`);
   say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
@@ -158,10 +162,10 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   }
   refuseClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
   say(`\n${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
-  say(`  Build  ${editScripts((s) => withStaticStep(s, out, site!.replace(/\/+$/, ""), BUILD[fw.kind]))}`);
+  say(`  Build  ${editScripts((s) => withStaticStep(s, out, trimSlashes(site!), BUILD[fw.kind]))}`);
   say(`\n  After each build: ./${out}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
   if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
-  robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", site!.replace(/\/+$/, ""));
+  robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", trimSlashes(site!));
   say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
 }
 
@@ -232,7 +236,8 @@ async function sitemapUrls(source: string): Promise<Sitemap["urls"]> {
 }
 
 async function runIndexNow() {
-  const site = (value("site") ?? process.env.SITEMAP_SITE_URL)?.replace(/\/+$/, "");
+  const given = value("site") ?? process.env.SITEMAP_SITE_URL;
+  const site = given === undefined ? undefined : trimSlashes(given);
   const key = value("key") ?? process.env.INDEXNOW_KEY;
   if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at: --site https://your.site");
   if (!key || !validKey(key)) fail("Give your IndexNow key: --key <8 to 128 letters, digits or dashes> (or set INDEXNOW_KEY).");

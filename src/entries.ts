@@ -59,9 +59,20 @@ export type ExpandOptions = {
   basePath?: string;
 };
 
-const SEGMENT = /\[\[?(?:\.\.\.)?([^\]]+)\]\]?/g;
+/**
+ * An address or path without its trailing slashes. A loop, not /\/+$/: that
+ * regex takes quadratic time on a long run of slashes that isn't at the end.
+ */
+export function trimSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
+// A parameter's name holds neither "[" nor "]", so each match can be read only one way.
+const SEGMENT = /\[\[?(?:\.\.\.)?([^[\]]+)\]\]?/g;
 /** A segment with a parameter anywhere in it: "[slug]", and also "v[version]" or "[lang]-docs" (Astro, SvelteKit). */
-const isDynamic = (part: string) => /\[[^\]]+\]/.test(part);
+const isDynamic = (part: string) => /\[[^[\]]+\]/.test(part);
 
 function fill(pattern: string, row: ParamRow): string | null {
   let missing = false;
@@ -101,8 +112,8 @@ export function unfilled(routes: Route[], options: Pick<ExpandOptions, "locales"
 }
 
 export async function expand(routes: Route[], options: ExpandOptions): Promise<Entry[]> {
-  const site = options.site.replace(/\/+$/, "");
-  const base = options.basePath?.replace(/\/+$/, "") ?? "";
+  const site = trimSlashes(options.site);
+  const base = options.basePath ? trimSlashes(options.basePath) : "";
   const url = (path: string) => {
     // Under a basePath the home page is "/docs", never "/docs/" (which redirects).
     const full = base ? (path === "/" ? base : `${base}${path}`) : path;
