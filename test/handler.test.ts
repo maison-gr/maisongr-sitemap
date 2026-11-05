@@ -78,6 +78,14 @@ describe("createSitemap", () => {
     expect(sections).toEqual(["Pages 4", "/blog/ 3"]);
   });
 
+  it("says so when there are no pages yet, instead of showing an empty list and a filter", async () => {
+    const { urlsetPage } = await import("../src/page.js");
+    const html = urlsetPage([], manifest.theme);
+    expect(html).toContain('<p class="empty">No pages are listed yet.');
+    expect(html).not.toContain('id="q"');
+    expect(html.match(/<h1>/g)).toHaveLength(1);
+  });
+
   it("escapes what it prints", async () => {
     const html = await (await get(handler, "/sitemap.xml", true)).text();
     expect(html).toContain("Every page on Example &amp; Co");

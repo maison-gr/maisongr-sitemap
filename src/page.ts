@@ -110,8 +110,13 @@ ${items}
     ? `<div class="chips" role="group" aria-label="Language"><button type="button" class="chip" data-f="" aria-pressed="true">All</button>${langs.map((l) => `<button type="button" class="chip" data-f="${esc(l)}" aria-pressed="false">${esc(l.toUpperCase())}</button>`).join("")}</div>`
     : "";
 
-  const body = `<p class="eyebrow">Sitemap</p>
-<h1>Every page on ${esc(theme.name)}<span class="mark">.</span></h1>
+  const heading = `<p class="eyebrow">Sitemap</p>
+<h1>Every page on ${esc(theme.name)}<span class="mark">.</span></h1>`;
+  if (!entries.length) {
+    return shell(theme, "Sitemap", `${heading}\n<p class="empty">No pages are listed yet. They appear here, and in the XML, once the site publishes them.</p>`, options);
+  }
+
+  const body = `${heading}
 <p class="facts"><span><b>${entries.length}</b> ${entries.length === 1 ? "page" : "pages"}</span>${counts}</p>
 <div class="tools">
 <input id="q" class="search" type="search" placeholder="Filter by path" aria-label="Filter pages by path" autocomplete="off" spellcheck="false">
