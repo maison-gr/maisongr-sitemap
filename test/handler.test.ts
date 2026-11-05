@@ -147,6 +147,16 @@ describe("createSitemap", () => {
     expect(await (await get(mounted, "/sitemap.xml", true)).text()).toContain('<a class="brand" href="/docs">');
   });
 
+  it("lists an address given twice once, and matches basePath by whole segment", async () => {
+    const extra = createSitemap({
+      manifest: { ...manifest, routes: [], locales: undefined },
+      basePath: "/docs/",
+      entries: () => [{ loc: "/docs/a" }, { loc: "/docs/a" }, { loc: "/docsearch" }, { loc: "/docs/search" }],
+      exclude: ["/search"],
+    });
+    expect(locs(await (await get(extra)).text())).toEqual(["https://www.example.com/docs/a", "https://www.example.com/docsearch"]);
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

@@ -78,7 +78,7 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
   const theme = mergeTheme(manifest.theme, options.theme);
   const ttl = (options.revalidate ?? 3600) * 1000;
   const trailingSlash = options.trailingSlash ?? manifest.trailingSlash;
-  const basePath = options.basePath ?? manifest.basePath;
+  const basePath = (options.basePath ?? manifest.basePath)?.replace(/\/+$/, "") || undefined;
   const page = { credit: options.credit, home: basePath || "/" };
   let cache: { at: number; site: string; entries: Promise<Entry[]> } | undefined;
 
@@ -97,11 +97,12 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
           .filter((e) => {
             // exclude is written without the basePath, as for routes.
             const path = new URL(e.loc).pathname;
-            const own = basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
-            return !matches(own, options.exclude ?? []);
+            const under = basePath && (path === basePath || path.startsWith(`${basePath}/`));
+            return !matches(under ? path.slice(basePath.length) || "/" : path, options.exclude ?? []);
           });
+        // Each address once, whatever produced it.
         const seen = new Set(fromRoutes.map((e) => e.loc));
-        return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc))];
+        return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc) && !!seen.add(e.loc))];
       })();
       cache = { at: Date.now(), site, entries };
       // A failed load is not kept: the next request tries again.
