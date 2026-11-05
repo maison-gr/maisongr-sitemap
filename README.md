@@ -230,6 +230,8 @@ With `--images`, each page's `og:image` and `<img>` sources go into an image sit
 
 Node 20.9 or later. No runtime dependencies.
 
+The package is an ES module. A CommonJS project (`require("@maison-gr/sitemap/node")`) needs Node 20.19 or 22.12 or later, which load ES modules through `require`.
+
 ## License
 
 MIT © [Maison GR](https://www.maisongr.com)
