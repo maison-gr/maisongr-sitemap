@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-05
+
 Every kind of site, tested on real projects: a Vite app, a Pages Router project, Eleventy, a hand-written HTML site and a server that renders each page on request.
 
 ### Added
@@ -14,12 +16,16 @@ Every kind of site, tested on real projects: a Vite app, a Pages Router project,
 - Static mode dates hand-written HTML from Git, takes `--add` for addresses no file holds, and `--clean-urls`.
 - `init --site` for a static generator with a `build` script (Eleventy and the like) adds static mode to it.
 - A clearer CLI: every line is marked ✓ done, ! needs a look or → next step, grouped under Found, Left out, Wrote and Next, and each run ends with Done and how many lines need a look. Errors say the cause first and the fix under it; a mistyped command suggests the one meant; an unexpected failure says it's a bug and where to report it, and exits with 2. Colour only on a terminal that shows it (`NO_COLOR`, `FORCE_COLOR` and `--no-color` are followed), and ASCII symbols in the old Windows console. `crawl` shows its progress as it reads.
+- After `init`, a "You can also" list: `build`, `indexnow`, `--help` and the guide. The fixes it prints use `npx`, as you'd type them.
 
 ### Fixed
 
 - Static mode lists `/about.html` when the site links to it that way, instead of an `/about` that plain Apache and nginx don't serve.
 - Static mode names the site from `og:site_name` or the part its titles share, not the first word of the home page's title.
 - `init --site` is written into the route of a site with a server, and `init` no longer says "App Router" for a project that only has the Pages Router.
+- `init` run again keeps the route and says so; given a `--site` the route lacks, it adds it, and one that names another address is kept with a warning. It used to report the route as written while keeping the old one.
+- `crawl` and static mode read minified HTML, whose attributes have no quotes (`<a href=/pricing>`, `<link rel=canonical …>`). A crawl of such a site found only its home page.
+- A missing `public/robots.txt` is reported as missing, not as a file that doesn't name the sitemap.
 
 ## [1.1.0] - 2026-11-05
 
@@ -82,5 +88,6 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.2.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.0.0
