@@ -81,6 +81,17 @@ describe("Next.js routes", () => {
     ]);
   });
 
+  it("reads noindex passed to a layout as a prop, but not noindex={false}", () => {
+    const root = project({
+      "app/a/page.tsx": "<Shell noindex>",
+      "app/b/page.tsx": "<Shell title='B' noindex />",
+      "app/c/page.tsx": "<Shell noindex={true} />",
+      "app/d/page.tsx": "<Shell noindex={false} />",
+      "app/e/page.tsx": "const noindexed = list.filter(Boolean);",
+    });
+    expect(appRoutes(root, "app").routes.map((r) => r.pattern).sort()).toEqual(["/d", "/e"]);
+  });
+
   it("does not let a conditional noindex in the root layout hide the whole site", () => {
     const root = project({ "app/layout.tsx": "robots: { index: process.env.X ? true : false }", "app/page.tsx": "" });
     expect(appRoutes(root, "app").routes.map((r) => r.pattern)).toEqual(["/"]);

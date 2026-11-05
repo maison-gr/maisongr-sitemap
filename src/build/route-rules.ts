@@ -22,8 +22,11 @@ const TOOL_SEGMENT = /^(dev|debug|test|internal|sandbox)(-|$)/;
 
 export const privateOf = (segments: string[]) => segments.find((s) => PRIVATE_SEGMENTS.has(s) || TOOL_SEGMENT.test(s));
 
-/** robots: { index: false }, robots: "noindex", or a noindex meta tag. */
-const NOINDEX = /index\s*:\s*false|["']noindex/;
+/**
+ * robots: { index: false }, robots: "noindex", a noindex meta tag, or a
+ * layout told so through a prop: <Layout noindex />, noindex={true}.
+ */
+const NOINDEX = /index\s*:\s*false|["']noindex|\snoindex(?=\s*(?:\/?>|\s[\w:@-]|=\{?\s*true\s*\}?))/;
 
 export const read = (file: string) => {
   try {
