@@ -157,6 +157,15 @@ describe("createSitemap", () => {
     expect((await get(big, "/sitemap.xml?part=3")).status).toBe(404);
   });
 
+  it("works with no manifest at all, for a server that lists its own addresses", async () => {
+    const bare = createSitemap({ site: "https://www.atelier.dev", entries: () => [{ loc: "/" }, { loc: "/work" }] });
+    expect(locs(await (await bare(new Request("http://internal:8080/sitemap.xml"))).text())).toEqual(["https://www.atelier.dev/", "https://www.atelier.dev/work"]);
+    const html = await (await bare(new Request("http://internal:8080/sitemap.xml", { headers: { "Sec-Fetch-Dest": "document" } }))).text();
+    expect(html).toContain("Every page on atelier.dev");
+    const css = await (await bare(new Request("http://internal:8080/sitemap.xml?asset=page.css"))).text();
+    expect(css).toContain("--bg:#fbfaf7");
+  });
+
   it("names a broken manifest instead of serving an empty sitemap", () => {
     expect(() => createSitemap({ manifest: {} })).toThrow(/maisongr-sitemap build/);
   });

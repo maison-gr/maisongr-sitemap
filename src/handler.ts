@@ -1,11 +1,15 @@
 import { dateOf, expand, matches, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
+import { DEFAULT_PALETTE } from "./build/palette.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
 import { indexXml, MAX_URLS, newest, urlsetXml } from "./xml.js";
 
 export type SitemapOptions = {
-  /** What the build step wrote (manifest.json): routes, their dates, and the theme. Checked when the route loads. */
-  manifest: Manifest | Record<string, unknown>;
+  /**
+   * What the build step wrote (manifest.json): routes, their dates, and the theme. Checked when the route loads.
+   * Without one, the sitemap lists `entries` alone, in a neutral theme `theme` can adjust.
+   */
+  manifest?: Manifest | Record<string, unknown>;
   /** The address the site is served at, e.g. "https://www.example.com". Defaults to the manifest's, then the request's origin. */
   site?: string;
   locales?: Locales;
@@ -47,15 +51,12 @@ function mergeTheme(base: Theme, over: SitemapOptions["theme"]): Theme {
   };
 }
 
-/**
- * One address, two readers. A browser opening the sitemap announces a page
- * visit with `Sec-Fetch-Dest: document` and gets the designed page; crawlers
- * never send it and get the XML. Both list exactly the same addresses (one
- * file presented two ways, not cloaking); the page is noindex, and Vary keeps
- * any cache from handing one to the other.
- */
+/** For a server with no build step: no routes of its own, a neutral theme, the name taken from the address. */
+const BARE: Manifest = { version: 1, framework: "custom", routes: [], theme: { name: "", light: DEFAULT_PALETTE, fonts: [] } };
+
 /** The manifest as the build step writes it; anything else is a setup mistake worth naming. */
 function asManifest(value: unknown): Manifest {
+  if (value === undefined) return BARE;
   const m = value as Partial<Manifest> | null;
   if (!m || m.version !== 1 || !Array.isArray(m.routes) || !m.theme?.light) {
     throw new Error("@maison-gr/sitemap: the manifest is missing or from another version. Run `maisongr-sitemap build`.");
@@ -63,7 +64,16 @@ function asManifest(value: unknown): Manifest {
   return m as Manifest;
 }
 
-export function createSitemap(options: SitemapOptions): (request: Request) => Promise<Response> {
+const hostOf = (site: string) => new URL(site).hostname.replace(/^www\./, "");
+
+/**
+ * One address, two readers. A browser opening the sitemap announces a page
+ * visit with `Sec-Fetch-Dest: document` and gets the designed page; crawlers
+ * never send it and get the XML. Both list exactly the same addresses (one
+ * file presented two ways, not cloaking); the page is noindex, and Vary keeps
+ * any cache from handing one to the other.
+ */
+export function createSitemap(options: SitemapOptions = {}): (request: Request) => Promise<Response> {
   const manifest = asManifest(options.manifest);
   const theme = mergeTheme(manifest.theme, options.theme);
   const ttl = (options.revalidate ?? 3600) * 1000;
@@ -111,6 +121,7 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
 
     const site = (options.site ?? manifest.site ?? url.origin).replace(/\/+$/, "");
     const entries = await load(site);
+    const named = theme.name ? theme : { ...theme, name: hostOf(site) };
     const browser = request.headers.get("sec-fetch-dest") === "document";
     const self = `${url.pathname}?asset=xml.css`;
     const pageHeaders = { ...VARY, "X-Robots-Tag": "noindex", "Cache-Control": "public, max-age=3600" };
@@ -124,18 +135,18 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
       if (!part) {
         const parts = chunks.map((c, i) => ({ loc: `${site}${url.pathname}?part=${i + 1}`, lastmod: newest(c), count: c.length }));
         return browser
-          ? respond(indexPage(parts, theme, page), "text/html", pageHeaders)
+          ? respond(indexPage(parts, named, page), "text/html", pageHeaders)
           : respond(indexXml(parts, self), "application/xml", xmlHeaders);
       }
       const chunk = chunks[part - 1];
       if (!chunk) return new Response("Not found", { status: 404, headers: VARY });
       return browser
-        ? respond(urlsetPage(chunk, theme, page), "text/html", pageHeaders)
+        ? respond(urlsetPage(chunk, named, page), "text/html", pageHeaders)
         : respond(urlsetXml(chunk, self), "application/xml", xmlHeaders);
     }
 
     return browser
-      ? respond(urlsetPage(entries, theme, page), "text/html", pageHeaders)
+      ? respond(urlsetPage(entries, named, page), "text/html", pageHeaders)
       : respond(urlsetXml(entries, self), "application/xml", xmlHeaders);
   };
 }
