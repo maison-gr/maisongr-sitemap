@@ -396,7 +396,10 @@ async function build() {
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   if (report.rebuilt) u.warn(`maisongr-sitemap: ${REBUILT}`, REBUILT_NOTE);
   u.ok(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated`, `→ ${rel(report.manifestPath)}`);
-  if (report.needParams.length) u.warn(`${plural(report.needParams.length, "dynamic route")} not listed yet: ${report.needParams.join(", ")}`, `give ${report.needParams.length === 1 ? "its" : "their"} values in params`);
+  // A route the route file already gives values for ("/blog/[slug]": …) is listed; only the others need a word.
+  const routeText = readFileSync(join(root, route!), "utf8");
+  const missing = report.needParams.filter((p) => !routeText.includes(`"${p}"`) && !routeText.includes(`'${p}'`));
+  if (missing.length) u.warn(`${plural(missing.length, "dynamic route")} not listed yet: ${missing.join(", ")}`, `give ${missing.length === 1 ? "its" : "their"} values in params`);
 }
 
 function runStatic() {

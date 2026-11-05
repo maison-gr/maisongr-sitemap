@@ -191,6 +191,16 @@ describe("what a person sees from each command", () => {
     expect(err).toContain("✗ No page could be listed from http://127.0.0.1:9.");
   });
 
+  it("build warns about a dynamic route only until the route file gives its values", async () => {
+    const root = project({ ...NEXT, "app/blog/[slug]/page.tsx": "" });
+    await run(["init", "--offline"], root);
+    expect((await run(["build", "--offline"], root)).out).toContain("! 1 dynamic route not listed yet: /blog/[slug]");
+    const route = join(root, "app/sitemap.xml/route.js");
+    const { readFileSync } = await import("node:fs");
+    writeFileSync(route, readFileSync(route, "utf8").replace("    ...pageParams,\n", '    ...pageParams,\n    "/blog/[slug]": () => [{ slug: "hello" }],\n'));
+    expect((await run(["build", "--offline"], root)).out).not.toContain("not listed yet");
+  });
+
   it("build stays short in a build log: no title, one line", async () => {
     const root = project(NEXT);
     await run(["init", "--offline"], root);
