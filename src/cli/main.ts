@@ -12,24 +12,33 @@ import { buildStatic, writeSitemapFiles } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
-const HELP = `maisongr-sitemap
+import { createUi, styleFor, type Style, type Ui } from "./ui.js";
+const HELP = `
+  maisongr-sitemap · one sitemap: XML for search engines, a designed page for people
 
-  maisongr-sitemap init              Detect the framework (Next.js, Astro, SvelteKit, Nuxt, Express) and set the sitemap up
-  maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
-  maisongr-sitemap static <dir> --site <url>
-                                     For sites with no server: write sitemap.xml and /sitemap/ into <dir>
-                                     --add /a,/b  more paths   --clean-urls  /about, never /about.html
-  maisongr-sitemap crawl <url> --out <dir> [--site <url>] [--max <pages>]
-                                     Any other site (PHP, Python, Ruby, a CMS): read it as a search engine does
-  maisongr-sitemap indexnow --site <url> --key <key>
-                                     Tell Bing and the other IndexNow engines which pages changed (after a deploy)
-                                     --since <YYYY-MM-DD> (default: yesterday)  --all  --dry-run  --sitemap <file or url>
-                                     --wait [seconds]  wait for a deploy to serve the key first (default 180)
+  Set up
+    maisongr-sitemap init               Detect the site and set the sitemap up
+                                        Next.js, Astro, SvelteKit, Nuxt, Express, Vite, static sites
+    maisongr-sitemap build              Re-read pages, dates and theme (init puts it in your build)
 
-  Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
-            --site      the address the site is served at (init, for a static build)
-            --images    (static) list each page's <img> and og:image in an image sitemap
-            --version   print the version          --help        print this
+  Sites without a server, and other languages
+    maisongr-sitemap static <dir> --site <url>
+                                        Write sitemap.xml and the page at /sitemap/ into a built site
+                                        --add /a,/b  more addresses     --clean-urls  /about, never /about.html
+    maisongr-sitemap crawl <url> --out <dir> [--site <url>] [--max <pages>]
+                                        Any site (PHP, Python, Ruby, a CMS), read as a search engine reads it
+
+  After a deploy
+    maisongr-sitemap indexnow --site <url> --key <key>
+                                        Tell Bing and the other IndexNow engines which pages changed
+                                        --since <YYYY-MM-DD>  --all  --dry-run  --wait [s]  --sitemap <file|url>
+
+  Options
+    --site <url>   the address the site is served at     --offline    don't download fonts
+    --images       list each page's images               --no-credit  leave out the footer credit
+    --no-color     plain text (also NO_COLOR=1)          --version    --help
+
+  Docs: https://github.com/maison-gr/sitemap
 `;
 
 /** The package's own version, from the package.json beside dist/ (or src/). */
@@ -37,7 +46,7 @@ const version = () => JSON.parse(readFileSync(new URL("../../package.json", impo
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-export type Io = { out: (s: string) => void; err: (s: string) => void };
+export type Io = { out: (s: string) => void; err: (s: string) => void; style?: Style; errStyle?: Style };
 
 /** A message for the person at the terminal; the command stops and exits with 1. */
 class Exit extends Error {}
@@ -45,7 +54,7 @@ class Exit extends Error {}
 // Set by main() for the one command it runs.
 let args: string[] = [];
 let root = "";
-let io: Io;
+let u: Ui;
 
 const flag = (name: string) => args.includes(`--${name}`);
 const value = (name: string) => {
@@ -53,7 +62,6 @@ const value = (name: string) => {
   return i === -1 ? undefined : args[i + 1];
 };
 const rel = (p: string) => relative(root, p).split("\\").join("/");
-const say = (s = "") => io.out(`${s}\n`);
 const fail = (s: string): never => {
   throw new Exit(s);
 };
@@ -63,27 +71,31 @@ const BUILD: Record<ServerKind["kind"], string> = { next: "next build", astro: "
 /** Where each framework's dev server listens, for the closing hint. */
 const DEV_PORT: Record<ServerKind["kind"], number> = { next: 3000, astro: 4321, sveltekit: 5173, nuxt: 3000 };
 
-const REBUILT = "manifest.json could not be read (a merge conflict?), so it was rebuilt from the project. Dates Git cannot see in this clone are left out.";
+const REBUILT = "manifest.json could not be read (a merge conflict?), so it was rebuilt from the project";
+const REBUILT_NOTE = "dates Git cannot see in this clone are left out";
 
 /** `pages` is false for a server whose pages come from its code, not from files. */
 function printReport(r: BuildReport, pages = true) {
-  if (r.rebuilt) say(`  Note: ${REBUILT}`);
-  if (pages) say(`  ${plural(r.routes, "page")} found, ${r.dated} dated from Git`);
-  if (r.locales) say(`  Languages: ${r.locales.list.join(", ")} (x-default: ${r.locales.default})`);
-  say(`  Site: ${r.site ?? "not found; the request's address is used (set SITEMAP_SITE_URL or pass site)"}`);
-  say(`  Theme: ${r.theme.name} · ${r.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${r.theme.fonts.map((f) => `${f.family} (${f.role})`).join(", ") || "system"}`);
-  if (r.missedFonts.length) say(`  Fonts not brought in (system fonts used instead): ${r.missedFonts.join(", ")}`);
-  if (r.skipped.length) {
-    say(`  Left out:`);
-    for (const s of r.skipped) say(`    ${s.pattern}  ${s.reason}`);
-  }
+  u.heading("Found");
+  if (r.rebuilt) u.warn(REBUILT, REBUILT_NOTE);
+  if (pages) u.ok(`${plural(r.routes, "page")} found`, `${r.dated} dated from Git`);
+  if (r.locales) u.ok(`Languages: ${r.locales.list.join(", ")}`, `x-default: ${r.locales.default}`);
+  if (r.site) u.ok(`Site: ${r.site}`);
+  else u.warn("Site address not found", "the request's address is used: pass --site or set SITEMAP_SITE_URL");
+  u.ok(`Theme: ${r.theme.name}`, `${r.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${r.theme.fonts.map((f) => `${f.family} (${f.role})`).join(", ") || "system"}`);
+  if (r.missedFonts.length) u.warn(`Fonts not brought in: ${r.missedFonts.join(", ")}`, "system fonts are used instead");
   if (r.fromPages?.length) {
-    say(`  Dynamic routes listed from their own generateStaticParams:`);
-    for (const p of r.fromPages) say(`    ${p}`);
+    u.ok(`${plural(r.fromPages.length, "dynamic route")} listed from their own static params`);
+    u.list(r.fromPages.map((path) => ({ path })));
+  }
+  if (r.skipped.length) {
+    u.heading("Left out", r.skipped.length);
+    u.list(r.skipped.map((s) => ({ path: s.pattern, reason: s.reason })));
   }
   if (r.needParams.length) {
-    say(`  Dynamic routes, listed only once the route file gives their values (params):`);
-    for (const p of r.needParams) say(`    ${p}`);
+    u.heading("Needs values", r.needParams.length);
+    u.warn(`${plural(r.needParams.length, "dynamic route")} not listed yet`, "give their values in the route file's params");
+    u.list(r.needParams.map((path) => ({ path })));
   }
 }
 
@@ -130,8 +142,8 @@ function robotsHint(fw: ServerKind, publicDir: string, site: string | undefined)
   const appDir = fw.kind === "next" ? (fw.appDir ?? (fw.srcDir ? "src/app" : "app")) : undefined;
   const generated = appDir ? ["robots.ts", "robots.js"].map((n) => join(root, appDir, n)).find(existsSync) : undefined;
   const file = generated ?? [join(root, publicDir, "robots.txt")].find(existsSync);
-  if (!file) return say(`  Add:   a robots.txt that names the sitemap: "${line}"`);
-  if (!/sitemap/i.test(readFileSync(file, "utf8"))) say(`  Add:   ${rel(file)} does not name the sitemap. Add "${line}"${generated ? " (the `sitemap` field)" : ""}.`);
+  if (!file) return u.warn(`No robots.txt names the sitemap. Add one with: ${u.code(`"${line}"`)}`);
+  if (!/sitemap/i.test(readFileSync(file, "utf8"))) u.warn(`${rel(file)} does not name the sitemap. Add ${u.code(`"${line}"`)}${generated ? " (the `sitemap` field)" : ""}.`);
 }
 
 /** A site that answers requests: the route tells browsers from crawlers at /sitemap.xml. */
@@ -141,7 +153,7 @@ async function initServer(fw: ServerKind) {
   const route = join(root, routePath(fw, existsSync(join(root, "tsconfig.json"))));
 
   const routers = fw.kind === "next" ? [fw.appDir && "App Router", fw.pagesDir && "Pages Router"].filter(Boolean).join(" + ") : "";
-  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""}${routers ? ` · ${routers}` : ""}`);
+  u.subject(`${LABEL[fw.kind]} ${fw.version ?? ""}${routers ? ` · ${routers}` : ""}`);
   const given = value("site");
   if (given && !/^https?:\/\//.test(given)) fail("--site takes the full address: --site https://your.site");
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
@@ -156,18 +168,19 @@ async function initServer(fw: ServerKind) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
-  say(`\n  Wrote  ${rel(route)}`);
-  say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
-  if (report.theme.fonts.length) say(`  Wrote  ${publicDir}/_sitemap/  (the page's fonts, served from your own domain)`);
-  say(`  Build  ${editScripts((s) => withBuildStep(s, BUILD[fw.kind]))}`);
+  u.heading("Wrote");
+  u.ok(rel(route));
+  u.ok(rel(report.manifestPath), "commit it: shallow CI clones keep its dates");
+  if (report.theme.fonts.length) u.ok(`${publicDir}/_sitemap/`, "the page's fonts, served from your own domain");
+  u.ok("package.json", editScripts((s) => withBuildStep(s, BUILD[fw.kind])));
 
-  say();
-  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install maisongr-sitemap`);
+  u.heading("Next");
+  if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install maisongr-sitemap"));
   robotsHint(fw, publicDir, given ? trimSlashes(given) : report.site);
   if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
-    say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
+    u.warn("Your middleware must let /sitemap.xml and /_sitemap/ through untouched", "no locale redirect");
   }
-  say(`  Open http://localhost:${DEV_PORT[fw.kind]}/sitemap.xml in a browser: the page. curl it: the XML.\n`);
+  u.next(`Open ${u.code(`http://localhost:${DEV_PORT[fw.kind]}/sitemap.xml`)}`, "a browser gets the page; curl gets the XML");
 }
 
 /** A site built to files: no server to tell browsers from crawlers, so static mode runs after each build. */
@@ -179,12 +192,14 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
     fail(`${LABEL[fw.kind]} builds to static files here (${why}). Static mode writes the sitemap into ./${out} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
   }
   refuseClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
-  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
-  say(`  Build  ${editScripts((s) => withStaticStep(s, out, trimSlashes(site!), BUILD[fw.kind]))}`);
-  say(`\n  After each build: ./${out}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
-  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
+  u.subject(`${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
+  u.heading("Wrote");
+  u.ok("package.json", editScripts((s) => withStaticStep(s, out, trimSlashes(site!), BUILD[fw.kind])));
+  u.text(`After each build: ./${out}/sitemap.xml for search engines, and the designed page at /sitemap/ for people.`);
+  u.heading("Next");
+  if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install --save-dev maisongr-sitemap"));
   robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", trimSlashes(site!));
-  say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
+  u.next("For the designed page at /sitemap.xml itself, add a server adapter and run init again");
 }
 
 /** The line that mounts the sitemap module, written as the server's own files import. */
@@ -206,29 +221,30 @@ function ownSitemapRoutes(module: string): string[] {
 /** An Express-style server: its routes live in code, its look in the frontend it serves. */
 async function initNode(found: Extract<ReturnType<typeof detect>, { kind: "node" }>) {
   const paths = nodePaths(root);
-  say(`\n${found.name} server${paths.entry ? ` · ${rel(paths.entry)}` : ""}`);
+  u.subject(`${found.name} server${paths.entry ? ` · ${rel(paths.entry)}` : ""}`);
   const report = await buildNode(root, found, { offline: flag("offline") });
-  say(report.client ? `  Frontend: ${rel(report.client.root) || "."} (fonts go to ${rel(report.client.publicDir)}/_sitemap/)` : "  Frontend: none found; the page uses a neutral theme (pass `theme` to set colours and fonts).");
   printReport(report, false);
+  if (report.client) u.ok(`Frontend: ${rel(report.client.root) || "."}`, `fonts go to ${rel(report.client.publicDir)}/_sitemap/`);
+  else u.warn("Frontend: none found", "the page uses a neutral theme: pass `theme` to set colours and fonts");
 
+  u.heading("Wrote");
   try {
     writeFileSync(paths.module, nodeModuleSource(paths.format, mountLine(paths.entry, paths.module, paths.format)), { flag: "wx" });
-    say(`\n  Wrote  ${rel(paths.module)}  (list your pages in its entries())`);
+    u.ok(rel(paths.module), "list your pages in its entries()");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    say(`\n  Kept   ${rel(paths.module)}  (already there)`);
+    u.ok(rel(paths.module), "kept: already there");
   }
-  say(`  Wrote  ${rel(report.manifestPath)}  (commit it)`);
-  if (report.theme.fonts.length && report.client) say(`  Wrote  ${rel(report.client.publicDir)}/_sitemap/  (the page's fonts, served from your own domain: commit them)`);
-  say(`  Build  ${editScripts((s) => (s?.build ? withBuildStep(s) : { scripts: { ...s, build: COMMAND }, note: `"build" script added to package.json: run it when the frontend's design changes` }))}`);
+  u.ok(rel(report.manifestPath), "commit it");
+  if (report.theme.fonts.length && report.client) u.ok(`${rel(report.client.publicDir)}/_sitemap/`, "the page's fonts, served from your own domain: commit them");
+  u.ok("package.json", editScripts((s) => (s?.build ? withBuildStep(s) : { scripts: { ...s, build: COMMAND }, note: `"build" script added: run it when the frontend's design changes` })));
 
-  say();
-  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install maisongr-sitemap`);
-  say(`  Mount: ${mountLine(paths.entry, paths.module, paths.format)}`);
-  say(`         before any catch-all route (a single-page app's "*"), so the sitemap answers first.`);
-  for (const f of ownSitemapRoutes(paths.module)) say(`  Replace: ${rel(f)} already answers a /sitemap…xml route. Remove it, so there is one sitemap.`);
-  say(`  Check: robots.txt names ${report.site ?? "https://your.site"}/sitemap.xml.`);
-  say(`  Open /sitemap.xml in a browser: the page. curl it: the XML.\n`);
+  u.heading("Next");
+  if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install maisongr-sitemap"));
+  u.next(`Mount it: ${u.code(mountLine(paths.entry, paths.module, paths.format))}`, `before any catch-all route (a single-page app's "*")`);
+  for (const f of ownSitemapRoutes(paths.module)) u.warn(`${rel(f)} already answers a /sitemap…xml route`, "remove it, so there is one sitemap");
+  u.next(`Check that robots.txt names ${report.site ?? "https://your.site"}/sitemap.xml`);
+  u.next(`Open ${u.code("/sitemap.xml")}`, "a browser gets the page; curl gets the XML");
 }
 
 /** A single-page app: one index.html, its pages in the router's table, so static mode runs after each build and reads that table. */
@@ -238,18 +254,24 @@ function initSpa(found: Extract<ReturnType<typeof detect>, { kind: "spa" }>) {
     fail(`${found.name} single-page app. Static mode writes the sitemap into ./${found.outDir} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
   }
   if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would be overwritten by this one. Remove it first; this replaces it.");
-  say(`\n${found.name} · single-page app, built to ./${found.outDir}`);
+  u.subject(`${found.name} · single-page app, built to ./${found.outDir}`);
   const routes = spaRoutes(root);
-  if (routes) {
-    say(`  ${plural(routes.paths.length, "page")} found in the ${routes.router} routes`);
-    for (const s of routes.skipped) say(`    Left out ${s.path}  ${s.reason}`);
-  } else say(`  No client-side router found: only the home page is listed. Add others with --add in the build script.`);
-  say(`  Build  ${editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site!), "vite build"))}`);
-  say(`\n  After each build: ./${found.outDir}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
-  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
+  u.heading("Found");
+  u.ok(`Site: ${trimSlashes(site!)}`);
+  if (routes) u.ok(`${plural(routes.paths.length, "page")} found`, `in the ${routes.router} routes`);
+  else u.warn("No client-side router found: only the home page is listed", "add others with --add in the build script");
+  if (routes?.skipped.length) {
+    u.heading("Left out", routes.skipped.length);
+    u.list(routes.skipped);
+  }
+  u.heading("Wrote");
+  u.ok("package.json", editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site!), "vite build")));
+  u.text(`After each build: ./${found.outDir}/sitemap.xml for search engines, and the designed page at /sitemap/ for people.`);
+  u.heading("Next");
+  if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install --save-dev maisongr-sitemap"));
   const robots = join(root, "public", "robots.txt");
-  if (!existsSync(robots) || !/sitemap/i.test(readFileSync(robots, "utf8"))) say(`  Add:   public/robots.txt naming "Sitemap: ${trimSlashes(site!)}/sitemap.xml"`);
-  say(`  Check: the host serves index.html for unknown paths (the usual single-page app setting), so every listed page answers.\n`);
+  if (!existsSync(robots) || !/sitemap/i.test(readFileSync(robots, "utf8"))) u.warn(`public/robots.txt does not name the sitemap. Add ${u.code(`"Sitemap: ${trimSlashes(site!)}/sitemap.xml"`)}`);
+  u.next("Check that your host serves index.html for unknown paths", "the usual single-page app setting, so every listed page answers");
 }
 
 async function init() {
@@ -264,17 +286,29 @@ async function init() {
     const pkg = readPackage(root);
     // A generator with a build script (Eleventy, Hugo through npm…): the sitemap is written after each build.
     if (pkg?.scripts?.build && site && /^https?:\/\//.test(site) && found.outDir !== ".") {
-      say(`\nStatic site, built to ./${found.outDir}`);
-      say(`  Build  ${editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site), "npm run build"))}`);
-      if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
-      return say(`  After each build: ./${found.outDir}/sitemap.xml, and the designed page at /sitemap/.\n`);
+      u.subject(`Static site, built to ./${found.outDir}`);
+      u.heading("Wrote");
+      u.ok("package.json", editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site), "npm run build")));
+      u.text(`After each build: ./${found.outDir}/sitemap.xml, and the designed page at /sitemap/.`);
+      if (!dependsOn("maisongr-sitemap")) {
+        u.heading("Next");
+        u.next(u.code("npm install --save-dev maisongr-sitemap"));
+      }
+      return;
     }
     fail(
       `A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site` +
         (pkg?.scripts?.build ? `\nOr add --site https://your.site to init, to run it after every build.` : ""),
     );
   }
-  if (found.kind === "unknown") fail("No supported framework found here (Next.js, Astro, SvelteKit, Nuxt, Express, or a static build with index.html).");
+  if (found.kind === "unknown") {
+    fail(
+      "No site found in this folder.\n" +
+        "init reads Next.js, Astro, SvelteKit, Nuxt, Express, Vite and Create React App projects, and static sites with an index.html.\n" +
+        "Run it from your project's folder, or, for a site in another language (PHP, Python, Ruby…):\n" +
+        "  maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site",
+    );
+  }
   const fw = found as ServerKind;
   if (fw.kind !== "next" && !fw.server) return initStatic(fw);
   return initServer(fw);
@@ -285,7 +319,7 @@ async function build() {
   if (found.kind === "node") {
     if (!existsSync(nodePaths(root).manifest)) fail("No sitemap set up here yet. Run `maisongr-sitemap init` first.");
     const report = await buildNode(root, found, { offline: flag("offline") });
-    say(`maisongr-sitemap: theme from ${report.client ? rel(report.client.root) || "." : "nothing (neutral)"} → ${rel(report.manifestPath)}`);
+    u.ok(`maisongr-sitemap: theme from ${report.client ? rel(report.client.root) || "." : "nothing (neutral)"}`, `→ ${rel(report.manifestPath)}`);
     return;
   }
   if (found.kind !== "next" && found.kind !== "astro" && found.kind !== "sveltekit" && found.kind !== "nuxt") {
@@ -293,17 +327,18 @@ async function build() {
   }
   const fw = found as ServerKind;
   if (fw.kind !== "next" && !fw.server) {
-    say(`maisongr-sitemap: ${LABEL[fw.kind]} builds static files here; the sitemap is written after the build by \`maisongr-sitemap static\`.`);
+    u.ok(`maisongr-sitemap: ${LABEL[fw.kind]} builds static files here`, "the sitemap is written after the build by `maisongr-sitemap static`");
     return;
   }
   const route = existingRoutes(fw).find((f) => existsSync(join(root, f)));
   if (!route) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
   if (fw.kind === "next" && usesCacheComponents(root) && /export\s+const\s+dynamic\b/.test(readFileSync(join(root, route!), "utf8"))) {
-    say(`maisongr-sitemap: cacheComponents is on, and it refuses the \`dynamic\` export in ${route!.split("\\").join("/")}. Remove that line: the route stays dynamic without it.`);
+    u.warn(`maisongr-sitemap: cacheComponents is on, and it refuses the \`dynamic\` export in ${route!.split("\\").join("/")}.`, "remove that line: the route stays dynamic without it");
   }
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
-  if (report.rebuilt) say(`maisongr-sitemap: ${REBUILT}`);
-  say(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(report.manifestPath)}`);
+  if (report.rebuilt) u.warn(`maisongr-sitemap: ${REBUILT}`, REBUILT_NOTE);
+  u.ok(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated`, `→ ${rel(report.manifestPath)}`);
+  if (report.needParams.length) u.warn(`${plural(report.needParams.length, "dynamic route")} not listed yet: ${report.needParams.join(", ")}`, "give their values in params");
 }
 
 function runStatic() {
@@ -315,10 +350,17 @@ function runStatic() {
   const routes = spaRoutes(root);
   const added = (value("add") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
   const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images"), cleanUrls: flag("clean-urls"), extra: [...(routes?.paths ?? []), ...added] });
-  say(`\n  ${plural(report.pages, "page")}${routes ? ` (${routes.router} routes included)` : ""} · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
-  for (const s of [...report.skipped, ...(routes?.skipped ?? [])]) say(`  Left out ${s.path}  ${s.reason}`);
-  for (const f of report.written) say(`  Wrote ${dir}/${f}`);
-  say(`\n  A static host cannot tell browsers from crawlers, so the designed page lives at /sitemap/ and /sitemap.xml is styled with CSS.\n`);
+  u.heading("Found");
+  u.ok(`${plural(report.pages, "page")}`, routes ? `${routes.router} routes included` : undefined);
+  u.ok(`Theme: ${report.theme.name}`, `${report.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${report.theme.fonts.map((f) => f.family).join(", ") || "system"}`);
+  const skipped = [...report.skipped, ...(routes?.skipped ?? [])];
+  if (skipped.length) {
+    u.heading("Left out", skipped.length);
+    u.list(skipped);
+  }
+  u.heading("Wrote");
+  for (const f of report.written) u.ok(`${dir}/${f}`);
+  u.text(u.paint("A static host can't tell browsers from crawlers: people get the page at /sitemap/, and /sitemap.xml is styled with CSS.", "dim"));
 }
 
 /** Any site at all (PHP, Python, Ruby, a CMS): read it as a search engine would, and write the sitemap files where its server serves files. */
@@ -331,18 +373,26 @@ async function runCrawl() {
   if (!existsSync(join(root, out!))) fail(`${out} does not exist. Give the folder your server serves files from (public/, the web root…).`);
   const max = value("max") ? Number(value("max")) : undefined;
   if (max !== undefined && !(max > 0)) fail("--max takes a number of pages: --max 5000");
-  say(`\n  Reading ${start}…`);
-  const report = await crawl(start!, { site, max, images: flag("images") });
-  if (!report.entries.length) fail(`No page could be listed from ${start}. Is the site running, and is its home page public?`);
+  u.subject(`Reading ${start}`);
+  const report = await crawl(start!, { site, max, images: flag("images"), onPage: (listed, seen) => u.progress(`Reading… ${plural(listed, "page")} listed, ${seen} addresses seen`) });
+  u.endProgress();
+  if (!report.entries.length) fail(`No page could be listed from ${start}.\nIs the site running, and is its home page public? Open it in a browser to check.`);
   const written = writeSitemapFiles(join(root, out!), report.entries, report.theme, !flag("no-credit"));
   const dated = report.entries.filter((e) => e.lastmod).length;
-  say(`  ${plural(report.entries.length, "page")}, ${dated} with a date the page states · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
-  if (report.capped) say(`  Stopped at --max ${max ?? 10000}: raise it to read further.`);
-  for (const s of report.skipped) say(`  Left out ${s.path}  ${s.reason}`);
-  if (report.queries) say(`  Not followed: ${report.queries} address${report.queries === 1 ? "" : "es"} with a query string (?…), which search engines treat as copies.`);
-  for (const f of written) say(`  Wrote ${out}/${f}`);
-  say(`\n  Run it again after content changes (a deploy step or a daily cron), so the list stays current.`);
-  say(`  The designed page is at /sitemap/; /sitemap.xml is styled with CSS for the browsers that open it.\n`);
+  u.heading("Found");
+  u.ok(plural(report.entries.length, "page"), `${dated} with a date the page states`);
+  u.ok(`Theme: ${report.theme.name}`, `${report.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${report.theme.fonts.map((f) => f.family).join(", ") || "system"}`);
+  if (report.capped) u.warn(`Stopped at ${plural(max ?? 10_000, "page")}`, "raise --max to read further");
+  if (report.skipped.length) {
+    u.heading("Left out", report.skipped.length);
+    u.list(report.skipped);
+  }
+  if (report.queries) u.text(u.paint(`Not followed: ${report.queries} address${report.queries === 1 ? "" : "es"} with a query string (?…), which search engines treat as copies.`, "dim"));
+  u.heading("Wrote");
+  for (const f of written) u.ok(`${out}/${f}`);
+  u.heading("Next");
+  u.next("Run it again after content changes", "a deploy step or a daily cron, so the list stays current");
+  u.next(`Open ${u.code(`${site ? trimSlashes(site) : new URL(start!).origin}/sitemap/`)}`, "the page; /sitemap.xml is styled with CSS for browsers that open it");
 }
 
 /** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
@@ -371,59 +421,110 @@ async function runIndexNow() {
   // --wait: right after a deploy, the new version (and its key file) may not be live yet.
   const waitFor = flag("wait") ? Number(value("wait")) || 180 : 0;
   const deadline = Date.now() + waitFor * 1000;
+  u.subject(`IndexNow · ${site}`);
   let served = await servesKey();
   while (!served && Date.now() < deadline) {
-    say(`  Waiting for ${keyFile}… (${Math.round((deadline - Date.now()) / 1000)}s left)`);
+    const left = `${Math.round((deadline - Date.now()) / 1000)}s left`;
+    if (u.live) u.progress(`Waiting for ${keyFile}… ${left}`);
+    else u.text(`Waiting for ${keyFile}… ${left}`);
     await new Promise((r) => setTimeout(r, Math.min(10_000, Math.max(0, deadline - Date.now()))));
     served = await servesKey();
   }
+  u.endProgress();
   if (!served) {
-    fail(`${keyFile} does not serve the key. Put a file named ${key}.txt, containing only the key, in your public directory, deploy, and run this again${waitFor ? "" : " (or add --wait to wait for a deploy)"}.`);
+    fail(
+      `${keyFile} does not serve the key.\n` +
+        `Put a file named ${key}.txt, containing only the key, in your public directory, deploy, and run this again${waitFor ? "." : ", or add --wait to wait for a deploy."}`,
+    );
   }
+  u.heading("Found");
+  u.ok(`The site serves its key`, keyFile);
 
   const since = flag("all") ? undefined : value("since") ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date: --since 2026-11-01");
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date.\n  maisongr-sitemap indexnow --since 2026-11-01");
   const urls = changedSince(await sitemapUrls(value("sitemap") ?? `${site}/sitemap.xml`), since);
-  say(`\n  ${plural(urls.length, "page")} ${since ? `changed since ${since}` : "in the sitemap"}`);
-  if (!urls.length) return say(`  Nothing to send.${since ? " Pages without a lastmod are sent only with --all." : ""}\n`);
+  if (!urls.length) {
+    u.ok(`No page ${since ? `changed since ${since}` : "in the sitemap"}`, since ? "pages without a lastmod are sent only with --all" : undefined);
+    return;
+  }
+  u.ok(`${plural(urls.length, "page")} ${since ? `changed since ${since}` : "in the sitemap"}`);
 
   if (flag("dry-run")) {
-    for (const u of urls.slice(0, 20)) say(`    ${u}`);
-    if (urls.length > 20) say(`    … and ${urls.length - 20} more`);
-    return say(`  Dry run: nothing was sent.\n`);
+    u.heading("Would send", urls.length);
+    u.list(urls.slice(0, 20).map((path) => ({ path })));
+    if (urls.length > 20) u.text(u.paint(`… and ${urls.length - 20} more`, "dim"));
+    u.warn("Dry run: nothing was sent", "run it without --dry-run to send");
+    return;
   }
   const results = await submit({ site: site!, key: key!, urls });
-  for (const r of results) say(`  Batch ${r.batch}: ${plural(r.urls, "page")} → ${r.status} ${r.meaning}`);
-  if (results.some((r) => r.status === 403)) {
-    say(`  A 403 usually means the engine has not verified the site: add ${site}/ in Bing Webmaster Tools with its own verification (an import from Google Search Console is not always enough).`);
+  u.heading("Sent");
+  for (const r of results) {
+    const text = `Batch ${r.batch}: ${plural(r.urls, "page")}`;
+    if (r.status < 300) u.ok(text, `${r.status} ${r.meaning}`);
+    else u.warn(text, `${r.status} ${r.meaning}`);
   }
-  if (results.some((r) => r.status >= 300)) fail("IndexNow did not accept every batch.");
-  say();
+  if (results.some((r) => r.status === 403)) {
+    u.next(`Add ${site}/ in Bing Webmaster Tools, with its own verification`, "a 403 means the engine has not verified the site; an import from Search Console is not always enough");
+  }
+  if (results.some((r) => r.status >= 300)) fail("IndexNow did not accept every batch.\nThe reason for each is above.");
 }
 
 /** Runs one command in `cwd` and returns the exit code. */
 export async function main(
   argv: string[],
   cwd: string,
-  streams: Io = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s) },
+  streams: Io = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s), style: styleFor(process.stdout), errStyle: styleFor(process.stderr) },
 ): Promise<number> {
   args = argv;
   root = cwd;
-  io = streams;
+  const plain: Style = { color: false, unicode: true };
+  const noColor = args.includes("--no-color");
+  const style = noColor ? { ...(streams.style ?? plain), color: false } : (streams.style ?? plain);
+  u = createUi(streams.out, style);
+  const started = Date.now();
+  const command = args[0];
   try {
-    const command = args[0];
-    if (command === "--version" || command === "-v") say(version());
-    else if (command === undefined || command === "help" || command === "--help" || command === "-h") say(HELP);
-    else if (command === "init") await init();
-    else if (command === "build") await build();
-    else if (command === "static") runStatic();
-    else if (command === "crawl") await runCrawl();
-    else if (command === "indexnow") await runIndexNow();
-    else fail(`Unknown command "${command}".\n\n${HELP}`);
+    if (command === "--version" || command === "-v") u.line(version());
+    else if (command === undefined || command === "help" || command === "--help" || command === "-h") u.line(HELP);
+    else if (COMMANDS[command]) {
+      // build runs inside every build and CI log: its one or two lines stand alone.
+      if (command !== "build") u.title(version(), command);
+      await COMMANDS[command]!();
+      if (command !== "build") u.done(Date.now() - started);
+    } else {
+      const near = Object.keys(COMMANDS).find((c) => distance(c, command) <= 2);
+      fail(`Unknown command "${command}".${near ? `\nDid you mean ${near}?\n  maisongr-sitemap ${near}` : ""}\nmaisongr-sitemap --help lists them all.`);
+    }
     return 0;
   } catch (error) {
-    if (!(error instanceof Exit)) throw error;
-    io.err(`\n${error.message}\n\n`);
+    u.endProgress();
+    if (!(error instanceof Exit)) {
+      // A bug, not a mistake the person made: say so, with what to report.
+      createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(
+        `maisongr-sitemap stopped on an unexpected error: ${(error as Error).message}\n` +
+          `Nothing past this point was written. Please report it, with the command you ran:\n  https://github.com/maison-gr/sitemap/issues`,
+      );
+      if (process.env.DEBUG) throw error;
+      return 2;
+    }
+    createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(error.message);
     return 1;
   }
+}
+
+const COMMANDS: Record<string, () => unknown> = { init, build, static: runStatic, crawl: runCrawl, indexnow: runIndexNow };
+
+/** How many letters apart two words are, for "did you mean". */
+function distance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const here = row[j]!;
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = here;
+    }
+  }
+  return row[b.length]!;
 }

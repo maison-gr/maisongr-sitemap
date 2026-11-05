@@ -13,6 +13,7 @@ Every kind of site, tested on real projects: a Vite app, a Pages Router project,
 - Pages Router pages are listed from their own `getStaticPaths`.
 - Static mode dates hand-written HTML from Git, takes `--add` for addresses no file holds, and `--clean-urls`.
 - `init --site` for a static generator with a `build` script (Eleventy and the like) adds static mode to it.
+- A clearer CLI: every line is marked ✓ done, ! needs a look or → next step, grouped under Found, Left out, Wrote and Next, and each run ends with Done and how many lines need a look. Errors say the cause first and the fix under it; a mistyped command suggests the one meant; an unexpected failure says it's a bug and where to report it, and exits with 2. Colour only on a terminal that shows it (`NO_COLOR`, `FORCE_COLOR` and `--no-color` are followed), and ASCII symbols in the old Windows console. `crawl` shows its progress as it reads.
 
 ### Fixed
 

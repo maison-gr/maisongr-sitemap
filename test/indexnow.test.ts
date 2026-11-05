@@ -61,12 +61,12 @@ describe("the indexnow command", () => {
     const { code, out } = await run(["indexnow", "--site", site, "--key", KEY, "--since", "2026-11-01"]);
     expect(code).toBe(0);
     expect(sent.map((s) => s.body.urlList)).toEqual([[`${site}/new`]]);
-    expect(out).toContain("Batch 1: 1 page → 200 received");
+    expect(out).toContain("✓ Batch 1: 1 page  200 received");
   });
 
   it("sends nothing on a dry run, nor before the key file is served", async () => {
     const sent = network({ [`${site}/${KEY}.txt`]: KEY, [`${site}/sitemap.xml`]: sitemap });
-    expect((await run(["indexnow", "--site", site, "--key", KEY, "--all", "--dry-run"])).out).toContain("Dry run: nothing was sent.");
+    expect((await run(["indexnow", "--site", site, "--key", KEY, "--all", "--dry-run"])).out).toContain("! Dry run: nothing was sent");
     network({ [`${site}/sitemap.xml`]: sitemap });
     const missing = await run(["indexnow", "--site", site, "--key", KEY, "--all"]);
     expect(missing.code).toBe(1);
@@ -81,7 +81,7 @@ describe("the indexnow command", () => {
     const { code, out, err } = await run(["indexnow", "--site", site, "--key", KEY, "--all", "--sitemap", "sitemap.xml"], root);
     expect(out).toContain("3 pages in the sitemap");
     expect(out).toContain("403 the key was not found");
-    expect(out).toContain("add https://www.atelier.dev/ in Bing Webmaster Tools");
+    expect(out).toContain("→ Add https://www.atelier.dev/ in Bing Webmaster Tools");
     expect(code).toBe(1);
     expect(err).toContain("did not accept every batch");
   });

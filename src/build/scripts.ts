@@ -17,7 +17,7 @@ export function withBuildStep(scripts: Record<string, string> = {}, fallback = "
   }
   if (out.build?.includes(COMMAND)) return { scripts: out, note: "already runs before each build" };
   out.build = out.build ? `${COMMAND} && ${out.build}` : `${COMMAND} && ${fallback}`;
-  return { scripts: out, note: `added to the "build" script in package.json` };
+  return { scripts: out, note: `added to the "build" script` };
 }
 
 /** For a static build: the sitemap is written into the output once the site's own build has finished. */
@@ -26,5 +26,5 @@ export function withStaticStep(scripts: Record<string, string> = {}, outDir: str
   const step = `maisongr-sitemap static ${outDir} --site ${site}`;
   if (out.build?.includes("maisongr-sitemap static")) return { scripts: out, note: "already runs after each build" };
   out.build = `${out.build ?? fallback} && ${step}`;
-  return { scripts: out, note: `added to the end of the "build" script in package.json` };
+  return { scripts: out, note: `added to the end of the "build" script` };
 }

@@ -19,6 +19,8 @@ export type CrawlOptions = {
   concurrency?: number;
   images?: boolean;
   fetch?: typeof fetch;
+  /** Called after each page is read, with the pages listed and the addresses seen so far. */
+  onPage?: (listed: number, seen: number) => void;
 };
 
 export type CrawlReport = { entries: Entry[]; skipped: { path: string; reason: string }[]; theme: Theme; capped: boolean; queries: number };
@@ -191,6 +193,7 @@ export async function crawl(start: string, options: CrawlOptions = {}): Promise<
         return;
       }
       await visit(queue[next++]!);
+      options.onPage?.(entries.length, seen.size);
     }
   }
   // Workers stop when the queue is momentarily empty, so start more until nothing new is found.
