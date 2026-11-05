@@ -18,6 +18,8 @@ export type BuildReport = {
   /** Dynamic routes that need `params` in the route file to be listed. */
   needParams: string[];
   missedFonts: string[];
+  /** The manifest already there could not be read (a merge conflict, say), so it was rebuilt from the project. */
+  rebuilt: boolean;
   site?: string;
   locales?: Manifest["locales"];
   theme: Theme;
@@ -82,6 +84,18 @@ export function layoutOf(root: string, appDir?: string): string | undefined {
   return ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"].map((n) => join(root, appDir, n)).find(existsSync);
 }
 
+/** The manifest the last build wrote, whose dates a shallow clone keeps. Unreadable counts as none. */
+function previousManifest(file: string): { previous: Manifest | null; rebuilt: boolean } {
+  if (!existsSync(file)) return { previous: null, rebuilt: false };
+  try {
+    const m = JSON.parse(read(file)) as Partial<Manifest>;
+    if (Array.isArray(m?.routes)) return { previous: m as Manifest, rebuilt: false };
+  } catch {
+    // Conflict markers or a hand edit: the project itself has everything else.
+  }
+  return { previous: null, rebuilt: true };
+}
+
 export function manifestPathOf(root: string, appDir: string) {
   return join(root, appDir, "sitemap.xml", "manifest.json");
 }
@@ -93,7 +107,7 @@ export async function buildNext(
 ): Promise<BuildReport> {
   const appDir = detected.appDir ?? (detected.srcDir ? "src/app" : "app");
   const manifestPath = manifestPathOf(root, appDir);
-  const previous: Manifest | null = existsSync(manifestPath) ? JSON.parse(read(manifestPath)) : null;
+  const { previous, rebuilt } = previousManifest(manifestPath);
 
   // Routes, from both routers when the project has both.
   const app = detected.appDir ? appRoutes(root, detected.appDir) : { routes: [], skipped: [] };
@@ -156,6 +170,7 @@ export async function buildNext(
     skipped: [...app.skipped, ...pages.skipped],
     needParams: unfilled(routes, { locales }),
     missedFonts: missed,
+    rebuilt,
     site,
     locales,
     theme,

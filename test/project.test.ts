@@ -130,6 +130,16 @@ describe("dates from Git", () => {
   });
 });
 
+describe("an unreadable manifest", () => {
+  it("is rebuilt from the project, and says so, instead of stopping the build", async () => {
+    const conflicted = `<<<<<<< HEAD\n{"version":1,"routes":[]}\n=======\n{"version":1,"routes":[{"pattern":"/"}]}\n>>>>>>> feature\n`;
+    const root = project({ "package.json": '{"dependencies":{"next":"15"}}', "app/page.tsx": "", "app/sitemap.xml/manifest.json": conflicted });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.rebuilt).toBe(true);
+    expect(JSON.parse(readFileSync(report.manifestPath, "utf8")).routes).toEqual([{ pattern: "/" }]);
+  });
+});
+
 describe("a full Next.js project", () => {
   it("finds routes, languages, site, name, icon and theme", async () => {
     const root = project({

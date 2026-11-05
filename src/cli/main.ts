@@ -57,7 +57,10 @@ export const GET = sitemap({
 });
 `;
 
+const REBUILT = "manifest.json could not be read (a merge conflict?), so it was rebuilt from the project. Dates Git cannot see in this clone are left out.";
+
 function printReport(r: BuildReport) {
+  if (r.rebuilt) say(`  Note: ${REBUILT}`);
   say(`  ${plural(r.routes, "page")} found, ${r.dated} dated from Git`);
   if (r.locales) say(`  Languages: ${r.locales.list.join(", ")} (x-default: ${r.locales.default})`);
   say(`  Site: ${r.site ?? "not found; the request's address is used (set SITEMAP_SITE_URL or pass site)"}`);
@@ -152,6 +155,7 @@ async function build() {
   const appDir = next.appDir ?? (next.srcDir ? "src/app" : "app");
   if (!existsSync(join(root, appDir, "sitemap.xml"))) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
   const report = await buildNext(root, next, { offline: flag("offline") });
+  if (report.rebuilt) say(`@maison-gr/sitemap: ${REBUILT}`);
   say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(manifestPathOf(root, appDir))}`);
 }
 
