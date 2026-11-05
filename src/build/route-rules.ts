@@ -18,10 +18,25 @@ export type Skipped = { pattern: string; reason: string };
  * private; "accounting-services" is not.
  */
 export const PRIVATE_WORDS = new Set([
-  "login", "logout", "signin", "signout", "signup", "register", "auth", "oauth", "sso", "callback",
-  "account", "accounts", "dashboard", "settings", "admin", "checkout", "cart", "billing", "onboarding",
-  "password", "verify", "confirm", "confirmation", "recovery", "unsubscribe", "invite", "invitation", "api",
+  "login", "logout", "signin", "signout", "signup", "auth", "oauth", "sso",
+  "account", "accounts", "dashboard", "settings", "admin", "checkout", "billing", "onboarding",
+  "password", "unsubscribe", "invitation", "api",
 ]);
+
+/**
+ * Words that name an account step only on their own (/register, /verify) or
+ * beside an account word (verify-email, order-confirmation): in a guide's name
+ * they are content ("recovery-strategies", "register-your-well").
+ */
+const STEP_WORDS = new Set(["register", "verify", "verification", "confirm", "confirmation", "recovery", "recover", "invite", "callback", "cart"]);
+const ACCOUNT_WORDS = new Set(["email", "mail", "phone", "password", "account", "code", "token", "otp", "link", "magic", "order", "payment", "subscription", "identity"]);
+
+function isPrivateName(segment: string): boolean {
+  const words = segment.toLowerCase().split(/[-_.]/).filter(Boolean);
+  if (words.some((w) => PRIVATE_WORDS.has(w))) return true;
+  if (!words.some((w) => STEP_WORDS.has(w))) return false;
+  return words.every((w) => STEP_WORDS.has(w)) || words.some((w) => ACCOUNT_WORDS.has(w));
+}
 
 /** Written as two words: sign-in, sign-up, sign-out, log-in, log-out. */
 const SPLIT_WORDS = /(^|-)(sign|log)-(in|up|out)(-|$)/;
@@ -30,7 +45,7 @@ const SPLIT_WORDS = /(^|-)(sign|log)-(in|up|out)(-|$)/;
 const TOOL_SEGMENT = /^(dev|debug|test|internal|sandbox)(-|$)/;
 
 const isPrivate = (segment: string) =>
-  !/^[[(]/.test(segment) && (SPLIT_WORDS.test(segment) || TOOL_SEGMENT.test(segment) || segment.split(/[-_.]/).some((w) => PRIVATE_WORDS.has(w)));
+  !/^[[(]/.test(segment) && (SPLIT_WORDS.test(segment) || TOOL_SEGMENT.test(segment) || isPrivateName(segment));
 
 export const privateOf = (segments: string[]) => segments.find(isPrivate);
 

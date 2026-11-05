@@ -97,6 +97,13 @@ describe("Next.js routes", () => {
     expect(appRoutes(root, "app").routes.map((r) => r.pattern).sort()).toEqual(["/accounting-services", "/apiary", "/cartography", "/signature"]);
   });
 
+  it("reads recovery, verify and their like as private only alone or beside an account word", () => {
+    // Resistaa's guide /adhd/mental-load/recovery-strategies is content, not an account page.
+    const pages = ["recovery-strategies", "register-your-well", "verify-water-quality", "invite-only-events", "verify-email", "register", "recovery", "confirm-phone", "api-keys"];
+    const root = project(Object.fromEntries(pages.map((n) => [`app/${n}/page.tsx`, ""])));
+    expect(appRoutes(root, "app").routes.map((r) => r.pattern).sort()).toEqual(["/invite-only-events", "/recovery-strategies", "/register-your-well", "/verify-water-quality"]);
+  });
+
   it("reads noindex passed to a layout as a prop, but not noindex={false}", () => {
     const root = project({
       "app/a/page.tsx": "<Shell noindex>",
