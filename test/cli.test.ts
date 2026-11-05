@@ -58,6 +58,15 @@ describe("init", () => {
     expect((await run(["build", "--offline"], root)).out).toContain("cacheComponents is on, and it refuses the `dynamic` export");
   });
 
+  it("says when robots.txt is missing or does not name the sitemap, and leaves it as it is", async () => {
+    expect((await run(["init", "--offline"], project(NEXT))).out).toContain('Add:   a robots.txt that names the sitemap: "Sitemap: https://your.site/sitemap.xml"');
+    const silent = project({ ...NEXT, "public/robots.txt": "User-agent: *\nAllow: /\n" });
+    expect((await run(["init", "--offline"], silent)).out).toContain("public/robots.txt does not name the sitemap.");
+    expect(readFileSync(join(silent, "public/robots.txt"), "utf8")).toBe("User-agent: *\nAllow: /\n");
+    const named = project({ ...NEXT, "app/robots.ts": 'export default () => ({ rules: { userAgent: "*" }, sitemap: "https://a.dev/sitemap.xml" })' });
+    expect((await run(["init", "--offline"], named)).out).not.toContain("Add:");
+  });
+
   it("refuses to replace a sitemap route that is not its own, and changes nothing", async () => {
     const root = project({ ...NEXT, "app/sitemap.xml/route.js": "export function GET() {}" });
     const { code, err } = await run(["init", "--offline"], root);

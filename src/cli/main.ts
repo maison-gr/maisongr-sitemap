@@ -102,6 +102,19 @@ function refuseClashes(fw: ServerKind, publicDir: string) {
   }
 }
 
+/**
+ * Whether robots.txt names the sitemap, which is how crawlers that never read
+ * Search Console find it. It only says what to add; it changes nothing.
+ */
+function robotsHint(fw: ServerKind, publicDir: string, site: string | undefined) {
+  const line = `Sitemap: ${site ?? "https://your.site"}/sitemap.xml`;
+  const appDir = fw.kind === "next" ? (fw.appDir ?? (fw.srcDir ? "src/app" : "app")) : undefined;
+  const generated = appDir ? ["robots.ts", "robots.js"].map((n) => join(root, appDir, n)).find(existsSync) : undefined;
+  const file = generated ?? [join(root, publicDir, "robots.txt")].find(existsSync);
+  if (!file) return say(`  Add:   a robots.txt that names the sitemap: "${line}"`);
+  if (!/sitemap/i.test(readFileSync(file, "utf8"))) say(`  Add:   ${rel(file)} does not name the sitemap. Add "${line}"${generated ? " (the `sitemap` field)" : ""}.`);
+}
+
 /** A site that answers requests: the route tells browsers from crawlers at /sitemap.xml. */
 async function initServer(fw: ServerKind) {
   const publicDir = fw.kind === "sveltekit" ? "static" : "public";
@@ -121,7 +134,9 @@ async function initServer(fw: ServerKind) {
   if (report.theme.fonts.length) say(`  Wrote  ${publicDir}/_sitemap/  (the page's fonts, served from your own domain)`);
   say(`  Build  ${editScripts((s) => withBuildStep(s, BUILD[fw.kind]))}`);
 
-  if (!dependsOn("@maison-gr/sitemap")) say(`\n  Next:  npm install @maison-gr/sitemap`);
+  say();
+  if (!dependsOn("@maison-gr/sitemap")) say(`  Next:  npm install @maison-gr/sitemap`);
+  robotsHint(fw, publicDir, report.site);
   if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
     say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
   }
@@ -141,6 +156,7 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   say(`  Build  ${editScripts((s) => withStaticStep(s, out, site!.replace(/\/+$/, ""), BUILD[fw.kind]))}`);
   say(`\n  After each build: ./${out}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
   if (!dependsOn("@maison-gr/sitemap")) say(`  Next:  npm install --save-dev @maison-gr/sitemap`);
+  robotsHint(fw, fw.kind === "sveltekit" ? "static" : "public", site!.replace(/\/+$/, ""));
   say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
 }
 
