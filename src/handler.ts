@@ -87,6 +87,8 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
   const basePath = trimSlashes(options.basePath ?? manifest.basePath ?? "") || undefined;
   const page = { credit: options.credit, home: basePath || "/" };
   let cache: { at: number; site: string; groups: Promise<Map<string, Entry[]>> } | undefined;
+  /** The last list that loaded, served when a later load fails: a 5xx on a sitemap costs crawl trust for every address in it. */
+  let lastGood: { site: string; groups: Map<string, Entry[]> } | undefined;
   const names = Object.keys(options.sitemaps ?? {});
   for (const name of names) {
     if (name === "pages" || !/^[\w-]+$/.test(name)) throw new Error(`maisongr-sitemap: "${name}" can't name a sitemap: use letters, digits, - and _, and not "pages", which the routes use.`);
@@ -130,6 +132,9 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
         return all;
       })();
       cache = { at: Date.now(), site, groups };
+      groups.then((loaded) => {
+        lastGood = { site, groups: loaded };
+      }, () => {});
       // A failed load is not kept: the next request tries again.
       groups.catch(() => {
         if (cache?.groups === groups) cache = undefined;
@@ -153,12 +158,23 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
     if (asset === "xml.css") return respond(xmlCss(theme), "text/css", { "Cache-Control": "public, max-age=86400" });
 
     const site = trimSlashes(options.site ?? manifest.site ?? url.origin);
-    const groups = await load(site);
+    let groups: Map<string, Entry[]>;
+    let stale = false;
+    try {
+      groups = await load(site);
+    } catch (error) {
+      // The database is down, say: answer with the last list that loaded, if there is one.
+      if (lastGood?.site !== site) throw error;
+      groups = lastGood.groups;
+      stale = true;
+    }
     const named = theme.name ? theme : { ...theme, name: hostOf(site) };
     const browser = request.headers.get("sec-fetch-dest") === "document";
     const self = `${url.pathname}?asset=xml.css`;
-    const pageHeaders = { ...VARY, "X-Robots-Tag": "noindex", "Cache-Control": "public, max-age=3600" };
-    const xmlHeaders = { ...VARY, "Cache-Control": "public, max-age=3600" };
+    // A stale answer is cached briefly, so the next request soon tries the source again.
+    const freshness: Record<string, string> = stale ? { "Cache-Control": "public, max-age=60", "X-Sitemap-Stale": "true" } : { "Cache-Control": "public, max-age=3600" };
+    const pageHeaders = { ...VARY, "X-Robots-Tag": "noindex", ...freshness };
+    const xmlHeaders = { ...VARY, ...freshness };
     const notFound = () => new Response("Not found", { status: 404, headers: VARY });
     const urlset = (entries: Entry[]) =>
       browser ? respond(urlsetPage(entries, named, page), "text/html", pageHeaders) : respond(urlsetXml(entries, self), "application/xml", xmlHeaders);
@@ -179,8 +195,9 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
 
     // Several: /sitemap.xml is their index, each one (or each of its parts) a file of its own.
     if (!name) {
+      // An empty sitemap is not listed: Search Console reports an empty child as an error against the whole index.
       return index(
-        [...groups].flatMap(([n, entries]) => {
+        [...groups].filter(([, entries]) => entries.length).flatMap(([n, entries]) => {
           const chunks = chunksOf(entries);
           return chunks.map((c, i) => ({
             loc: at(`sitemap=${n}${chunks.length > 1 ? `&part=${i + 1}` : ""}`),

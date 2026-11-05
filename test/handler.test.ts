@@ -169,6 +169,27 @@ describe("createSitemap", () => {
     expect(xml).toContain("<loc>https://elsewhere.dev/fr/about</loc>\n  </url>");
   });
 
+  it("serves the last good list, marked stale, when a later load fails", async () => {
+    let calls = 0;
+    const flaky = createSitemap({
+      manifest: { ...manifest, routes: [], locales: undefined },
+      revalidate: 0,
+      entries: () => {
+        calls++;
+        if (calls > 1) throw new Error("db down");
+        return [{ loc: "/jobs/1" }];
+      },
+    });
+    const first = await get(flaky);
+    expect(first.headers.get("x-sitemap-stale")).toBeNull();
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await get(flaky);
+    expect(second.status).toBe(200);
+    expect(second.headers.get("x-sitemap-stale")).toBe("true");
+    expect(second.headers.get("cache-control")).toBe("public, max-age=60");
+    expect(locs(await second.text())).toEqual(["https://www.example.com/jobs/1"]);
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });
@@ -198,11 +219,9 @@ describe("createSitemap", () => {
     });
     const index = await (await get(several)).text();
     expect(index).toContain("<sitemapindex");
-    expect(locs(index)).toEqual([
-      "https://www.example.com/sitemap.xml?sitemap=pages",
-      "https://www.example.com/sitemap.xml?sitemap=companies",
-      "https://www.example.com/sitemap.xml?sitemap=jobs",
-    ]);
+    // "jobs" is empty, so the index leaves it out: Search Console would report it as an error.
+    expect(locs(index)).toEqual(["https://www.example.com/sitemap.xml?sitemap=pages", "https://www.example.com/sitemap.xml?sitemap=companies"]);
+    expect(locs(await (await get(several, "/sitemap.xml?sitemap=jobs")).text())).toEqual([]);
     expect(index).toContain("<lastmod>2026-11-02</lastmod>");
     // "/" is listed once, in the first sitemap that has it.
     expect(locs(await (await get(several, "/sitemap.xml?sitemap=companies")).text())).toEqual(["https://www.example.com/c/acme"]);
@@ -216,8 +235,7 @@ describe("createSitemap", () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, sitemaps: { products: () => many } });
     expect(locs(await (await get(big)).text())).toEqual([
-      "https://www.example.com/sitemap.xml?sitemap=pages",
-      // & is written &amp; in XML.
+      // "pages" has nothing (no routes, no entries), so it isn't listed. & is written &amp; in XML.
       "https://www.example.com/sitemap.xml?sitemap=products&amp;part=1",
       "https://www.example.com/sitemap.xml?sitemap=products&amp;part=2",
     ]);
