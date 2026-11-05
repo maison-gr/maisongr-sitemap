@@ -5,7 +5,7 @@ import type { Manifest, Theme } from "../types.js";
 import { blocks, scopes } from "./css.js";
 import { materialize, type FontSource } from "./fonts.js";
 import { gitDates } from "./git-dates.js";
-import type { FoundRoute, Skipped } from "./next-routes.js";
+import type { FoundRoute, Skipped } from "./route-rules.js";
 import { DEFAULT_PALETTE, palette } from "./palette.js";
 
 export type BuildReport = {
