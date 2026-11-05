@@ -25,3 +25,7 @@ The first release.
 - `@maison-gr/sitemap/node` for Express, Connect, Polka and `node:http`, and `createSitemap` for any server that speaks `Request` and `Response`.
 - `static <dir>` for static sites: `sitemap.xml` styled with CSS, and the designed page at `/sitemap/`.
 - Sitemap index of `?part=N` files past 50,000 addresses.
+- Image, video and news sitemaps, with only the tags Google still reads. `static --images` takes each page's images from its HTML.
+- `indexnow`: sends changed addresses to Bing and the other IndexNow engines, after checking the site serves its key.
+- `init` says when `robots.txt` doesn't name the sitemap.
+- Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
