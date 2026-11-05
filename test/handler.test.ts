@@ -190,6 +190,16 @@ describe("createSitemap", () => {
     expect(locs(await second.text())).toEqual(["https://www.example.com/jobs/1"]);
   });
 
+  it("lets transform add images to any address, or leave one out", async () => {
+    const shaped = createSitemap({
+      manifest: { ...manifest, routes: [{ pattern: "/" }, { pattern: "/work" }, { pattern: "/drafts" }], locales: undefined },
+      transform: (e) => (e.loc.endsWith("/drafts") ? null : e.loc.endsWith("/work") ? { ...e, images: ["/studio.jpeg"] } : e),
+    });
+    const xml = await (await get(shaped)).text();
+    expect(locs(xml)).toEqual(["https://www.example.com/", "https://www.example.com/work"]);
+    expect(xml).toContain("<image:loc>https://www.example.com/studio.jpeg</image:loc>");
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

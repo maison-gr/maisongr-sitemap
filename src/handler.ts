@@ -23,6 +23,12 @@ export type SitemapOptions = {
    * at /sitemap.xml?sitemap=<name>, which Search Console reports on separately.
    */
   sitemaps?: Record<string, () => EntryInput[] | Promise<EntryInput[]>>;
+  /**
+   * Changes each address before it is written: add images, set a date, or return
+   * null to leave it out. Runs last, on every sitemap, after `exclude`.
+   *   transform: (entry) => ({ ...entry, images: imagesFor(new URL(entry.loc).pathname) })
+   */
+  transform?: (entry: Entry) => Entry | null | Promise<Entry | null>;
   /** Paths to leave out, from routes and `entries` alike: exact paths, prefixes ("/drafts/") or patterns. */
   exclude?: (string | RegExp)[];
   /** The site serves "/about/" rather than "/about". Defaults to the manifest's (Next.js `trailingSlash`). */
@@ -129,7 +135,13 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
         if (locales?.folders && extra.length) {
           linkFolders(pages.filter((e) => e.loc.startsWith(`${site}/`) || e.loc === site).map((entry) => ({ path: ownPath(entry.loc), entry })), locales);
         }
-        return all;
+        if (!options.transform) return all;
+        const changed = new Map<string, Entry[]>();
+        for (const [name, list] of all) {
+          const out = await Promise.all(list.map((e) => options.transform!(e)));
+          changed.set(name, out.filter((e): e is Entry => e !== null && e !== undefined));
+        }
+        return changed;
       })();
       cache = { at: Date.now(), site, groups };
       groups.then((loaded) => {
