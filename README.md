@@ -306,8 +306,15 @@ Run it again whenever content changes, after a deploy or from a daily cron, so t
 
 ## Telling search engines
 
-- **robots.txt.** Crawlers find a sitemap through a `Sitemap:` line in `robots.txt`. `init` tells you when the line is missing, without editing the file.
-- **Search Console and Bing Webmaster Tools.** Submit `https://your.site/sitemap.xml` once in each.
+- **`connect`** sets up the rest, in the folder your site serves:
+
+  ```sh
+  npx maisongr-sitemap connect --site https://www.example.com --google google1234abcd5678ef90.html --bing <code> --indexnow
+  ```
+
+  - **robots.txt:** creates it, or adds the `Sitemap:` line it lacks, after asking. `--yes` answers for you (in CI, without it, nothing is written). A robots.txt your code writes (`app/robots.ts`) or that names another sitemap is left alone, with what to change.
+  - **Verification files:** `--google` writes the HTML file Google Search Console gives you, `--bing` the `BingSiteAuth.xml` Bing Webmaster Tools gives you, `--indexnow` an IndexNow key file (with a new key if you give none). A file already there with other content is never replaced.
+- **Search Console and Bing Webmaster Tools.** Submit `https://your.site/sitemap.xml` once in each, choosing the HTML file method to verify.
 - **IndexNow.** Bing, Yandex, Seznam, Naver and the other participating engines take a list of changed addresses directly. After a deploy:
 
   ```sh

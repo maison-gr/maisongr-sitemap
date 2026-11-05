@@ -3,7 +3,8 @@ import { dirname, join, relative } from "node:path";
 import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
-import { buildNode, nodePaths, type ModuleFormat } from "../build/node-build.js";
+import { bingFile, googleFile, indexNowFile, otherSitemap, robotsWithSitemap } from "../build/connect.js";
+import { buildNode, clientOf, nodePaths, servedDirs, type ModuleFormat } from "../build/node-build.js";
 import { findSite, sourceFiles } from "../build/project.js";
 import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
 import { spaRoutes } from "../build/spa-routes.js";
@@ -28,7 +29,9 @@ const HELP = `
     maisongr-sitemap crawl <url> --out <dir> [--site <url>] [--max <pages>]
                                         Any site (PHP, Python, Ruby, a CMS), read as a search engine reads it
 
-  After a deploy
+  Search engines
+    maisongr-sitemap connect [--google <file>] [--bing <code>] [--indexnow [key]] [--yes]
+                                        robots.txt naming the sitemap (asks first), and the files that verify the site
     maisongr-sitemap indexnow --site <url> --key <key>
                                         Tell Bing and the other IndexNow engines which pages changed
                                         --since <YYYY-MM-DD>  --all  --dry-run  --wait [s]  --sitemap <file|url>
@@ -47,7 +50,26 @@ const version = () => JSON.parse(readFileSync(new URL("../../package.json", impo
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-export type Io = { out: (s: string) => void; err: (s: string) => void; style?: Style; errStyle?: Style };
+export type Io = {
+  out: (s: string) => void;
+  err: (s: string) => void;
+  style?: Style;
+  errStyle?: Style;
+  /** A yes/no question to the person at the terminal. Without one (CI, a pipe), every answer is no. */
+  ask?: (question: string) => Promise<boolean>;
+};
+
+/** Asks on the terminal; anywhere else, says no without waiting. */
+async function askTerminal(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(`  ${question} [y/N] `)).trim());
+  } finally {
+    rl.close();
+  }
+}
 
 /** A message for the person at the terminal; the command stops and exits with 1. */
 class Exit extends Error {}
@@ -56,6 +78,7 @@ class Exit extends Error {}
 let args: string[] = [];
 let root = "";
 let u: Ui;
+let ask: (question: string) => Promise<boolean> = async () => false;
 
 const flag = (name: string) => args.includes(`--${name}`);
 const value = (name: string) => {
@@ -295,6 +318,7 @@ function whatElse() {
   const rebuilds = found.kind === "node" || ((found.kind === "next" || found.kind === "astro" || found.kind === "sveltekit" || found.kind === "nuxt") && (found.kind === "next" || found.server));
   u.heading("You can also");
   if (rebuilds) u.next(u.code("npx maisongr-sitemap build"), "re-read pages, dates and theme now; your build already runs it");
+  u.next(u.code("npx maisongr-sitemap connect"), "robots.txt, and the files Google, Bing and IndexNow check");
   u.next(u.code("npx maisongr-sitemap indexnow --site <url> --key <key>"), "after a deploy, tell Bing and the other IndexNow engines what changed");
   u.next(u.code("npx maisongr-sitemap --help"), "every command and option");
   u.next(u.code("https://github.com/maison-gr/sitemap#readme"), "the full guide");
@@ -426,6 +450,105 @@ async function runCrawl() {
   u.next(`Open ${u.code(`${site ? trimSlashes(site) : new URL(start!).origin}/sitemap/`)}`, "the page; /sitemap.xml is styled with CSS for browsers that open it");
 }
 
+/** Files that answer /robots.txt from code, which connect can only advise on. */
+const ROBOTS_ROUTES = ["app/robots.ts", "app/robots.js", "src/app/robots.ts", "src/app/robots.js", "src/pages/robots.txt.ts", "src/pages/robots.txt.js", "src/routes/robots.txt/+server.ts", "src/routes/robots.txt/+server.js", "server/routes/robots.txt.ts"];
+
+/** The folder the site serves files from at its root, where robots.txt and the verification files go. */
+function publicDirOf(found: ReturnType<typeof detect>): string | undefined {
+  const given = value("public");
+  if (given) return given;
+  if (found.kind === "sveltekit") return "static";
+  if (found.kind === "next" || found.kind === "astro" || found.kind === "nuxt" || found.kind === "spa") return "public";
+  if (found.kind === "node") {
+    const client = clientOf(root, servedDirs(root, sourceFiles(root)));
+    return client ? rel(client.publicDir) : existsSync(join(root, "public")) ? "public" : undefined;
+  }
+  if (found.kind === "static" && found.outDir === ".") return ".";
+  return undefined;
+}
+
+/** Writes a file the site serves, unless one with other content is already there. */
+function placeFile(dir: string, name: string, body: string, what: string) {
+  const file = join(root, dir, name);
+  const shown = `${dir === "." ? "" : `${dir}/`}${name}`;
+  if (existsSync(file)) {
+    if (readFileSync(file, "utf8").trim() === body.trim()) return u.ok(shown, `${what}: already there`);
+    return u.warn(`${shown} is already there, with other content`, "kept as it is; remove it first to replace it");
+  }
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, body);
+  u.ok(shown, what);
+}
+
+/**
+ * What search engines need besides the sitemap: robots.txt naming it, and the
+ * files Google, Bing and IndexNow fetch to check the site is yours. It asks
+ * before changing robots.txt, and never replaces a file it did not write.
+ */
+async function runConnect() {
+  const found = detect(root);
+  const site = value("site") ?? process.env.SITEMAP_SITE_URL ?? findSite(sourceFiles(root));
+  if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at.\n  npx maisongr-sitemap connect --site https://your.site");
+  const base = trimSlashes(site!);
+  const publicDir = publicDirOf(found);
+  if (!publicDir) fail("Name the folder your site serves files from at its root.\n  npx maisongr-sitemap connect --public public --site https://your.site");
+  if (!existsSync(join(root, publicDir!))) fail(`${publicDir} does not exist.\nGive the folder your site serves files from at its root with --public.`);
+
+  u.subject(`Connecting ${base} to search engines`);
+  u.heading("robots.txt");
+  const route = ROBOTS_ROUTES.find((f) => existsSync(join(root, f)));
+  const served = found.kind === "node" ? sourceFiles(root).find((f) => /\.(?:get|use|all)\s*\(\s*["'`]\/robots\.txt/.test(readFileSync(f, "utf8"))) : undefined;
+  const code = route ? join(root, route) : served;
+  if (code) {
+    const src = readFileSync(code, "utf8");
+    if (/sitemap\.xml/.test(src)) u.ok(`${rel(code)} names a sitemap`, "check it is " + `${base}/sitemap.xml`);
+    else u.warn(`${rel(code)} writes robots.txt and does not name the sitemap`, `add "Sitemap: ${base}/sitemap.xml"${route ? " (the `sitemap` field)" : ""}`);
+  } else {
+    const file = join(root, publicDir!, "robots.txt");
+    const current = existsSync(file) ? readFileSync(file, "utf8") : null;
+    const other = current && otherSitemap(current, base);
+    const next = robotsWithSitemap(current, base);
+    if (other) u.warn(`robots.txt names ${other}`, `not ${base}/sitemap.xml: change that line yourself if this one replaces it`);
+    else if (next.change === "none") u.ok("robots.txt names the sitemap");
+    else {
+      const what = next.change === "created" ? `Create ${rel(file)}, allowing every crawler and naming the sitemap?` : `Add "Sitemap: ${base}/sitemap.xml" to ${rel(file)}?`;
+      if (flag("yes") || (await ask(what))) {
+        writeFileSync(file, next.text);
+        u.ok(rel(file), next.change === "created" ? "created, naming the sitemap" : "the Sitemap line added at its end");
+      } else u.warn(next.change === "created" ? `No robots.txt` : `${rel(file)} does not name the sitemap`, `left as it is; run again with --yes to ${next.change === "created" ? "create it" : "add the line"}`);
+    }
+  }
+
+  u.heading("Verification files");
+  const google = value("google");
+  const bing = value("bing");
+  if (google) {
+    const f = googleFile(google);
+    if (!f) fail(`--google takes the file Google gives you, such as google1234abcd5678ef90.html.`);
+    placeFile(publicDir!, f!.name, f!.body, "Google Search Console's file");
+  }
+  if (bing) {
+    const f = bingFile(bing);
+    if (!f) fail(`--bing takes the 32-character code from Bing Webmaster Tools' BingSiteAuth.xml.`);
+    placeFile(publicDir!, f!.name, f!.body, "Bing Webmaster Tools' file");
+  }
+  let key: string | undefined;
+  if (flag("indexnow")) {
+    const given = value("indexnow");
+    const f = indexNowFile(given && !given.startsWith("--") ? given : undefined);
+    if (!f) fail("--indexnow takes a key of 8 to 128 letters, digits or dashes, or none to make one.");
+    key = f!.key;
+    placeFile(publicDir!, f!.name, f!.body, "the IndexNow key");
+  }
+  if (!google && !bing && !flag("indexnow")) u.text(u.paint("None asked for: add --google <file>, --bing <code> or --indexnow.", "dim"));
+
+  u.heading("Next");
+  u.next(`Deploy, then submit ${u.code(`${base}/sitemap.xml`)} in Google Search Console`, "https://search.google.com/search-console");
+  u.next("And in Bing Webmaster Tools", "https://www.bing.com/webmasters");
+  if (google || bing) u.next("Choose the HTML file method there to verify the site", "the file is served from your own domain once deployed");
+  if (key) u.next(`After each deploy: ${u.code(`npx maisongr-sitemap indexnow --site ${base} --key ${key}`)}`, "keep the key: it's in the file's name");
+}
+
 /** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
 async function sitemapUrls(source: string): Promise<Sitemap["urls"]> {
   const read = async (where: string) => {
@@ -504,10 +627,11 @@ async function runIndexNow() {
 export async function main(
   argv: string[],
   cwd: string,
-  streams: Io = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s), style: styleFor(process.stdout), errStyle: styleFor(process.stderr) },
+  streams: Io = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s), style: styleFor(process.stdout), errStyle: styleFor(process.stderr), ask: askTerminal },
 ): Promise<number> {
   args = argv;
   root = cwd;
+  ask = streams.ask ?? (async () => false);
   const plain: Style = { color: false, unicode: true };
   const noColor = args.includes("--no-color");
   const style = noColor ? { ...(streams.style ?? plain), color: false } : (streams.style ?? plain);
@@ -543,7 +667,7 @@ export async function main(
   }
 }
 
-const COMMANDS: Record<string, () => unknown> = { init, build, static: runStatic, crawl: runCrawl, indexnow: runIndexNow };
+const COMMANDS: Record<string, () => unknown> = { init, build, static: runStatic, crawl: runCrawl, connect: runConnect, indexnow: runIndexNow };
 
 /** How many letters apart two words are, for "did you mean". */
 function distance(a: string, b: string): number {
