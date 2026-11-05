@@ -16,4 +16,5 @@ Security fixes go into the latest release.
   - `init`: the sitemap route file, its manifest, `public/_sitemap/` (or `static/_sitemap/`), and the `build` script in `package.json`;
   - `build`: the manifest and `_sitemap/`;
   - `static <dir>`: `sitemap.xml`, `sitemap.css` and `sitemap/` inside `<dir>`.
+- **`indexnow`**, only when you run it, reads your site's key file and sitemap, then sends your site's address, your key and the changed addresses to `api.indexnow.org`. `--dry-run` reads but sends nothing.
 - **At runtime**, the route serves only what the manifest and your `params` and `entries` return, escaped as XML and HTML. It reads one request header, `Sec-Fetch-Dest`, and the request's address. It sends nothing anywhere.
