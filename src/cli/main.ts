@@ -1,17 +1,20 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { detect, readPackage } from "../build/detect.js";
-import { buildNext, manifestPathOf, type BuildReport } from "../build/next-build.js";
-import { COMMAND, withBuildStep } from "../build/scripts.js";
+import { buildFramework, configuredSite } from "../build/framework-build.js";
+import { buildNext, type BuildReport } from "../build/next-build.js";
+import { withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
+import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
 const HELP = `@maison-gr/sitemap
 
-  maisongr-sitemap init              Detect the framework and set the sitemap up
+  maisongr-sitemap init              Detect the framework (Next.js, Astro, SvelteKit, Nuxt) and set the sitemap up
   maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
   maisongr-sitemap static <dir> --site <url>
                                      For sites with no server: write sitemap.xml and /sitemap/ into <dir>
 
   Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
+            --site      the address the site is served at (init, for a static build)
             --version   print the version          --help        print this
 `;
 
@@ -41,21 +44,10 @@ const fail = (s: string): never => {
   throw new Exit(s);
 };
 
-const routeFile = () => `// The sitemap: XML for search engines, a designed page for people, at one address.
-// Routes, dates and theme come from ./manifest.json, which \`${COMMAND}\` rewrites before each build.
-// Docs: https://github.com/maison-gr/sitemap
-import { sitemap } from "@maison-gr/sitemap/next";
-import manifest from "./manifest.json";
-
-// The answer depends on the request's Sec-Fetch-Dest header, so the route stays dynamic.
-export const dynamic = "force-dynamic";
-
-export const GET = sitemap({
-  manifest,
-  // Dynamic routes are listed once you give their values, for example:
-  // params: { "/blog/[slug]": async () => (await getPosts()).map((p) => ({ slug: p.slug, lastmod: p.updatedAt })) },
-});
-`;
+/** Each framework's own build, for a project whose package.json has no build script yet. */
+const BUILD: Record<ServerKind["kind"], string> = { next: "next build", astro: "astro build", sveltekit: "vite build", nuxt: "nuxt build" };
+/** Where each framework's dev server listens, for the closing hint. */
+const DEV_PORT: Record<ServerKind["kind"], number> = { next: 3000, astro: 4321, sveltekit: 5173, nuxt: 3000 };
 
 const REBUILT = "manifest.json could not be read (a merge conflict?), so it was rebuilt from the project. Dates Git cannot see in this clone are left out.";
 
@@ -76,22 +68,86 @@ function printReport(r: BuildReport) {
   }
 }
 
-/** Runs the build step before the site's own build, keeping the package.json's indentation. */
-function addBuildStep(): string {
+/** Rewrites package.json's scripts, keeping its indentation. */
+function editScripts(change: (scripts: Record<string, string> | undefined) => { scripts: Record<string, string>; note: string }): string {
   const file = join(root, "package.json");
   const pkg = readPackage(root) ?? fail("No package.json here.");
-  const { scripts, note } = withBuildStep(pkg.scripts);
+  const { scripts, note } = change(pkg.scripts);
   pkg.scripts = scripts;
   const indent = readFileSync(file, "utf8").match(/^\{\r?\n([ \t]+)/)?.[1] ?? "  ";
   writeFileSync(file, JSON.stringify(pkg, null, indent) + "\n");
   return note;
 }
 
+const dependsOn = (name: string) => {
+  const pkg = readPackage(root);
+  return !!(pkg?.dependencies?.[name] || pkg?.devDependencies?.[name]);
+};
+
+/** Stops before anything is written if another file or package already answers /sitemap.xml. */
+function refuseClashes(fw: ServerKind, publicDir: string) {
+  for (const f of existingRoutes(fw)) {
+    if (existsSync(join(root, f)) && !readFileSync(join(root, f), "utf8").includes("@maison-gr/sitemap")) {
+      fail(`${f.split("\\").join("/")} already serves /sitemap.xml and is not this package's. Move it aside first; nothing was changed.`);
+    }
+  }
+  if (existsSync(join(root, publicDir, "sitemap.xml"))) fail(`${publicDir}/sitemap.xml would shadow the route. Remove it first; this replaces it.`);
+  for (const rival of RIVALS[fw.kind].filter(dependsOn)) {
+    fail(
+      rival === "next-sitemap"
+        ? "next-sitemap writes public/sitemap.xml after each build, which would shadow this route.\n" +
+            "Remove it and its postbuild script first. Keep a robots.txt that names /sitemap.xml (app/robots.ts or public/robots.txt)."
+        : `${rival} serves a sitemap of its own. Remove it first, so search engines are given one sitemap, and point robots.txt at /sitemap.xml.`,
+    );
+  }
+}
+
+/** A site that answers requests: the route tells browsers from crawlers at /sitemap.xml. */
+async function initServer(fw: ServerKind) {
+  const publicDir = fw.kind === "sveltekit" ? "static" : "public";
+  refuseClashes(fw, publicDir);
+  const route = join(root, routePath(fw, existsSync(join(root, "tsconfig.json"))));
+
+  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""}${fw.kind === "next" ? ` · App Router${fw.pagesDir ? " + Pages Router" : ""}` : ""}`);
+  const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
+  printReport(report);
+
+  if (!existsSync(route)) {
+    mkdirSync(dirname(route), { recursive: true });
+    writeFileSync(route, routeSource(fw, route.endsWith(".ts")));
+  }
+  say(`\n  Wrote  ${rel(route)}`);
+  say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
+  if (report.theme.fonts.length) say(`  Wrote  ${publicDir}/_sitemap/  (the page's fonts, served from your own domain)`);
+  say(`  Build  ${editScripts((s) => withBuildStep(s, BUILD[fw.kind]))}`);
+
+  if (!dependsOn("@maison-gr/sitemap")) say(`\n  Next:  npm install @maison-gr/sitemap`);
+  if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
+    say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
+  }
+  say(`  Open http://localhost:${DEV_PORT[fw.kind]}/sitemap.xml in a browser: the page. curl it: the XML.\n`);
+}
+
+/** A site built to files: no server to tell browsers from crawlers, so static mode runs after each build. */
+function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nuxt" }>) {
+  const out = STATIC_OUT[fw.kind];
+  const site = value("site") ?? configuredSite(root, fw.kind);
+  const why = { astro: "it has no adapter", sveltekit: "it uses adapter-static", nuxt: "it is built with nuxt generate" }[fw.kind];
+  if (!site || !/^https?:\/\//.test(site)) {
+    fail(`${LABEL[fw.kind]} builds to static files here (${why}). Static mode writes the sitemap into ./${out} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
+  }
+  refuseClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
+  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
+  say(`  Build  ${editScripts((s) => withStaticStep(s, out, site!.replace(/\/+$/, ""), BUILD[fw.kind]))}`);
+  say(`\n  After each build: ./${out}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
+  if (!dependsOn("@maison-gr/sitemap")) say(`  Next:  npm install --save-dev @maison-gr/sitemap`);
+  say(`  For the designed page at /sitemap.xml itself, add a server adapter and run init again.\n`);
+}
+
 async function init() {
   const found = detect(root);
-  if (found.kind === "unsupported" || found.kind === "astro" || found.kind === "sveltekit" || found.kind === "nuxt") {
-    const name = found.kind === "unsupported" ? found.name : { astro: "Astro", sveltekit: "SvelteKit", nuxt: "Nuxt" }[found.kind];
-    fail(`${name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
+  if (found.kind === "unsupported") {
+    fail(`${found.name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
   }
   if (found.kind === "node") {
     fail(
@@ -103,68 +159,26 @@ async function init() {
   if (found.kind === "static") {
     fail(`A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site`);
   }
-  if (found.kind !== "next") fail("No supported framework found here (Next.js, or a static build with index.html).");
-  const next = found as Extract<typeof found, { kind: "next" }>;
-
-  const appDir = next.appDir ?? (next.srcDir ? "src/app" : "app");
-  for (const clash of ["sitemap.ts", "sitemap.js", "sitemap.tsx"]) {
-    if (existsSync(join(root, appDir, clash))) fail(`${appDir}/${clash} already serves /sitemap.xml. Remove it first; this replaces it.`);
-  }
-  if (next.pagesDir) {
-    for (const ext of ["js", "jsx", "ts", "tsx"]) {
-      for (const clash of [`sitemap.xml.${ext}`, `sitemap.xml/index.${ext}`]) {
-        if (existsSync(join(root, next.pagesDir, clash))) fail(`${next.pagesDir}/${clash} already serves /sitemap.xml. Remove it first; this replaces it.`);
-      }
-    }
-  }
-  if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would shadow the route. Remove it first; this replaces it.");
-  const pkg = readPackage(root);
-  if (pkg?.dependencies?.["next-sitemap"] || pkg?.devDependencies?.["next-sitemap"]) {
-    fail(
-      "next-sitemap writes public/sitemap.xml after each build, which would shadow this route.\n" +
-        "Remove it and its postbuild script first. Keep a robots.txt that names /sitemap.xml (app/robots.ts or public/robots.txt).",
-    );
-  }
-
-  const ts = existsSync(join(root, "tsconfig.json"));
-  const route = join(root, appDir, "sitemap.xml", ts ? "route.ts" : "route.js");
-  const other = join(root, appDir, "sitemap.xml", ts ? "route.js" : "route.ts");
-  for (const f of [route, other]) {
-    if (existsSync(f) && !readFileSync(f, "utf8").includes("@maison-gr/sitemap")) {
-      fail(`${rel(f)} already exists and is not this package's. Move it aside first; nothing was changed.`);
-    }
-  }
-
-  say(`\nNext.js ${next.version ?? ""} · App Router${next.pagesDir ? " + Pages Router" : ""}`);
-  const report = await buildNext(root, next, { offline: flag("offline") });
-  printReport(report);
-
-  if (!existsSync(route)) {
-    mkdirSync(dirname(route), { recursive: true });
-    writeFileSync(route, routeFile());
-  }
-  say(`\n  Wrote  ${rel(route)}`);
-  say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
-  if (report.theme.fonts.length) say(`  Wrote  public/_sitemap/  (the page's fonts, served from your own domain)`);
-  say(`  Build  ${addBuildStep()}`);
-
-  const deps = { ...readPackage(root)?.dependencies };
-  if (!deps["@maison-gr/sitemap"]) say(`\n  Next:  npm install @maison-gr/sitemap`);
-  if (["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
-    say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
-  }
-  say(`  Open http://localhost:3000/sitemap.xml in a browser: the page. curl it: the XML.\n`);
+  if (found.kind === "unknown") fail("No supported framework found here (Next.js, Astro, SvelteKit, Nuxt, Express, or a static build with index.html).");
+  const fw = found as ServerKind;
+  if (fw.kind !== "next" && !fw.server) return initStatic(fw);
+  return initServer(fw);
 }
 
 async function build() {
   const found = detect(root);
-  if (found.kind !== "next") fail("`build` is for Next.js projects. For a static site use `maisongr-sitemap static <dir> --site <url>`.");
-  const next = found as Extract<typeof found, { kind: "next" }>;
-  const appDir = next.appDir ?? (next.srcDir ? "src/app" : "app");
-  if (!existsSync(join(root, appDir, "sitemap.xml"))) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
-  const report = await buildNext(root, next, { offline: flag("offline") });
+  if (found.kind !== "next" && found.kind !== "astro" && found.kind !== "sveltekit" && found.kind !== "nuxt") {
+    fail("`build` reads Next.js, Astro, SvelteKit and Nuxt projects. For a static site use `maisongr-sitemap static <dir> --site <url>`.");
+  }
+  const fw = found as ServerKind;
+  if (fw.kind !== "next" && !fw.server) {
+    say(`@maison-gr/sitemap: ${LABEL[fw.kind]} builds static files here; the sitemap is written after the build by \`maisongr-sitemap static\`.`);
+    return;
+  }
+  if (!existingRoutes(fw).some((f) => existsSync(join(root, f)))) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
+  const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   if (report.rebuilt) say(`@maison-gr/sitemap: ${REBUILT}`);
-  say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(manifestPathOf(root, appDir))}`);
+  say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(report.manifestPath)}`);
 }
 
 function runStatic() {

@@ -56,6 +56,67 @@ describe("init", () => {
   });
 });
 
+describe("init for Astro, SvelteKit and Nuxt", () => {
+  const scripts = (root: string) => JSON.parse(readFileSync(join(root, "package.json"), "utf8")).scripts;
+
+  it("writes an on-demand Astro endpoint when the site has an adapter", async () => {
+    const root = project({
+      "package.json": '{"name":"a","scripts":{"build":"astro build"},"dependencies":{"astro":"7"}}',
+      "tsconfig.json": "{}",
+      "astro.config.mjs": "export default defineConfig({ adapter: node({ mode: 'standalone' }) })",
+      "src/pages/index.astro": "",
+    });
+    const { code, out } = await run(["init", "--offline"], root);
+    expect(code).toBe(0);
+    const route = readFileSync(join(root, "src/pages/sitemap.xml.ts"), "utf8");
+    expect(route).toContain("export const prerender = false;");
+    expect(route).toContain('import manifest from "../sitemap.manifest.json";');
+    expect(route).toContain("export const GET: APIRoute = ({ request }) => sitemap(request);");
+    expect(JSON.parse(readFileSync(join(root, "src/sitemap.manifest.json"), "utf8")).framework).toBe("astro");
+    expect(scripts(root).build).toBe("maisongr-sitemap build && astro build");
+    expect(out).toContain("http://localhost:4321/sitemap.xml");
+  });
+
+  it("writes the SvelteKit and Nuxt routes where each framework routes them", async () => {
+    const kit = project({ "package.json": '{"devDependencies":{"@sveltejs/kit":"3","@sveltejs/adapter-node":"6"}}', "src/routes/+page.svelte": "" });
+    expect((await run(["init", "--offline"], kit)).code).toBe(0);
+    expect(readFileSync(join(kit, "src/routes/sitemap.xml/+server.js"), "utf8")).toContain("export const GET = ({ request }) => sitemap(request);");
+    expect(scripts(kit).build).toBe("maisongr-sitemap build && vite build");
+
+    const nuxt = project({ "package.json": '{"dependencies":{"nuxt":"4"},"scripts":{"build":"nuxt build"}}', "app/app.vue": "" });
+    expect((await run(["init", "--offline"], nuxt)).code).toBe(0);
+    expect(readFileSync(join(nuxt, "server/routes/sitemap.xml.js"), "utf8")).toContain("toWebRequest(event)");
+    expect(JSON.parse(readFileSync(join(nuxt, "server/sitemap.manifest.json"), "utf8")).routes).toEqual([{ pattern: "/" }]);
+  });
+
+  it("runs static mode after a static build, with the site from astro.config", async () => {
+    const root = project({
+      "package.json": '{"scripts":{"build":"astro build"},"dependencies":{"astro":"7"}}',
+      "astro.config.mjs": 'export default defineConfig({ site: "https://www.atelier.dev/" })',
+      "src/pages/index.astro": "",
+    });
+    expect((await run(["init"], root)).code).toBe(0);
+    expect(scripts(root).build).toBe("astro build && maisongr-sitemap static dist --site https://www.atelier.dev");
+    expect((await run(["build"], root)).out).toContain("builds static files here");
+  });
+
+  it("asks for the address when a static build does not give one, and changes nothing", async () => {
+    const pkg = '{"scripts":{"build":"nuxt generate"},"dependencies":{"nuxt":"4"}}';
+    const root = project({ "package.json": pkg, "app/app.vue": "" });
+    const { code, err } = await run(["init"], root);
+    expect(code).toBe(1);
+    expect(err).toContain("it is built with nuxt generate");
+    expect(readFileSync(join(root, "package.json"), "utf8")).toBe(pkg);
+    expect((await run(["init", "--site", "https://harbour.app"], root)).code).toBe(0);
+    expect(scripts(root).build).toBe("nuxt generate && maisongr-sitemap static .output/public --site https://harbour.app");
+  });
+
+  it("refuses when another sitemap package would serve a second sitemap", async () => {
+    const root = project({ "package.json": '{"dependencies":{"nuxt":"4","@nuxtjs/sitemap":"7"}}', "app/app.vue": "" });
+    expect((await run(["init", "--offline"], root)).err).toContain("@nuxtjs/sitemap serves a sitemap of its own");
+  });
+});
+
 describe("init on a server whose routes live in code", () => {
   it("shows the Node adapter instead of scanning", async () => {
     const { code, err } = await run(["init"], project({ "package.json": '{"dependencies":{"express":"5"}}' }));

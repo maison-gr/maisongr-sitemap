@@ -117,6 +117,13 @@ function nuxtFacts(root: string, detected: Extract<Server, { kind: "nuxt" }>): P
   };
 }
 
+/** The address the project's own config gives the site (Astro's `site`, Nuxt's `site.url`), or the environment's. */
+export function configuredSite(root: string, kind: Server["kind"]): string | undefined {
+  if (kind === "astro") return findSite([]) ?? httpSite(firstMatch(configOf(root, ASTRO_CONFIGS)?.source ?? "", /\bsite\s*:\s*["'](https?:\/\/[^"']+)["']/));
+  if (kind === "nuxt") return findSite([]) ?? httpSite(firstMatch(configOf(root, NUXT_CONFIGS)?.source ?? "", /\bsite\s*:\s*\{[^}]*\burl\s*:\s*["'](https?:\/\/[^"']+)["']/));
+  return findSite([]);
+}
+
 /** Builds the manifest for an Astro, SvelteKit or Nuxt site that runs a server. */
 export function buildFramework(root: string, detected: Server, options: { offline?: boolean } = {}): Promise<BuildReport> {
   const facts = detected.kind === "astro" ? astroFacts(root, detected) : detected.kind === "sveltekit" ? svelteFacts(root, detected) : nuxtFacts(root, detected);
