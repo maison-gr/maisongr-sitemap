@@ -4,6 +4,12 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-05
+
+### Fixed
+
+- Words such as recovery, verify, confirm, register and invite make a page private only on their own (`/register`) or beside an account word (`verify-email`, `order-confirmation`). A guide named `recovery-strategies` was left out by `crawl` and static mode.
+
 ## [1.4.0] - 2026-11-05
 
 Found by moving AquaDrill, a prerendered Vite app, onto the package.
@@ -113,6 +119,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.4.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.1
 [1.4.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.0
 [1.3.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.2.0
