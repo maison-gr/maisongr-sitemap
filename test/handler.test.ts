@@ -133,6 +133,16 @@ describe("createSitemap", () => {
     expect(await (await get(dated)).text()).toContain("<lastmod>2026-10-31</lastmod>");
   });
 
+  it("resolves language versions given as paths, as it does the address itself", async () => {
+    const pairs = createSitemap({
+      manifest: { ...manifest, routes: [], locales: undefined },
+      entries: () => [{ loc: "/about", alternates: [{ hreflang: "fr-CA", href: "/fr/a-propos" }, { hreflang: "en-CA", href: "/about" }] }],
+    });
+    const xml = await (await get(pairs)).text();
+    expect(xml).toContain('<xhtml:link rel="alternate" hreflang="fr-CA" href="https://www.example.com/fr/a-propos"/>');
+    expect(xml).not.toMatch(/hreflang="[^"]+" href="\//);
+  });
+
   it("resolves relative entries against the site and applies exclude to them too", async () => {
     const extra = createSitemap({
       manifest: { ...manifest, routes: [], locales: undefined },

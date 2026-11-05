@@ -115,15 +115,22 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
   };
 
   /** Addresses as given, made absolute and dated, without the excluded ones. */
-  const normalize = (list: EntryInput[], site: string, from: string): Entry[] =>
-    list
+  const normalize = (list: EntryInput[], site: string, from: string): Entry[] => {
+    const absolute = (value: string) => {
+      const loc = value.startsWith("/") ? `${site}${value}` : value;
+      if (!URL.canParse(loc)) throw new Error(`maisongr-sitemap: ${from} gave "${value}", which is neither an address nor a path.`);
+      return loc;
+    };
+    return list
       .map(({ lastmod, ...e }) => {
-        const loc = e.loc.startsWith("/") ? `${site}${e.loc}` : e.loc;
-        if (!URL.canParse(loc)) throw new Error(`maisongr-sitemap: ${from} gave "${e.loc}", which is neither an address nor a path.`);
+        const loc = absolute(e.loc);
+        // Language versions may be paths too: "/fr/a-propos".
+        const alternates = e.alternates?.map((a) => ({ ...a, href: absolute(a.href) }));
         const day = dateOf(lastmod);
-        return day ? { ...e, loc, lastmod: day } : { ...e, loc };
+        return { ...e, loc, ...(alternates ? { alternates } : {}), ...(day ? { lastmod: day } : {}) };
       })
       .filter((e) => !matches(ownPath(e.loc), options.exclude ?? []));
+  };
 
   /** The sitemaps by name: "pages" (routes and `entries`), then each of `sitemaps`. */
   const load = (site: string) => {
