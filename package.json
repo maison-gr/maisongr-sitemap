@@ -28,7 +28,7 @@
     }
   },
   "bin": {
-    "maisongr-sitemap": "./dist/cli/index.js"
+    "maisongr-sitemap": "dist/cli/index.js"
   },
   "exports": {
     ".": {
