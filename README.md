@@ -26,7 +26,7 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 
 | | **maisongr-sitemap** | next-sitemap | @astrojs/sitemap |
 |---|---|---|---|
-| Frameworks | Next.js, Astro, SvelteKit, Nuxt, Express, any `Request`/`Response` server, any static site | Next.js | Astro |
+| Frameworks | Next.js, Astro, SvelteKit, Nuxt, Express, any `Request`/`Response` server, single-page apps, any static site, any language through `crawl` | Next.js | Astro |
 | What a person sees at `/sitemap.xml` | A page in your site's design | Raw XML | XML styled with your own XSL |
 | `lastmod` | The last commit that changed each page | Build time, by default | What you set |
 | `hreflang` alternates | Read from your routes and i18n config | Configured | From its `i18n` option |
@@ -53,9 +53,11 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 | **Static builds**: Astro without an adapter, SvelteKit with `adapter-static`, `nuxt generate` | Static mode, run after your build |
 | **Express**, Connect, Polka, `node:http` | `sitemap.js` beside the server's entry, themed from the frontend it serves (see [Express](#express-and-nodehttp)) |
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
-| **Any static site**, from any generator | [`static`](#static-sites) on the build output |
+| **Single-page apps**: Vite (React, Vue, Solid, Svelte, Preact) and Create React App | Static mode after your build, with the pages read from your router (see [Single-page apps](#single-page-apps)) |
+| **Any static site**: hand-written HTML, Eleventy, Hugo, Jekyll, any generator | [`static`](#static-sites) on the build output |
+| **Any other language**: PHP (Laravel, WordPress, Symfony), Python, Ruby, Go, Java, .NET, a CMS | [`crawl`](#any-site-in-any-language) reads the running site |
 
-Each one has been checked on a real production build: Next.js 15 and 16 (with `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4 and React Router 8. The handler also runs on Bun 1.4 and Deno 2.9.
+Each one has been checked on a real production build: Next.js 15 and 16 (App Router, Pages Router and `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4, React Router 8, a Vite React app, Eleventy 3, a hand-written HTML site and a server that renders each page on request. The handler also runs on Bun 1.4 and Deno 2.9.
 
 ## What `init` does
 
@@ -266,11 +268,40 @@ npx maisongr-sitemap static dist --site https://www.example.com
 - `sitemap.xml`, styled with CSS, for crawlers;
 - the designed page at `/sitemap/`, for people.
 
-It reads the built HTML, so each page's language and `hreflang` links come from the pages themselves. It leaves out pages marked `noindex`, redirects, and sign-in and account pages. The theme comes from your stylesheets and the CSS your build inlined. For a static build of Astro, SvelteKit or Nuxt, `init` adds this step to the end of your `build` script.
+It reads the built HTML, so each page's language and `hreflang` links come from the pages themselves. It leaves out pages marked `noindex`, redirects, and sign-in and account pages. The theme comes from your stylesheets and the CSS your build inlined, and the name from what your pages say (`og:site_name`, or the part their titles share). For a static build of Astro, SvelteKit or Nuxt, `init` adds this step to the end of your `build` script; for another generator with a `build` script, `init --site https://your.site` does the same.
 
-Static mode writes no `lastmod`: built files don't say when their content changed, and a build date would be false.
+- **Addresses** follow your links. A site that links to `/about.html` gets `/about.html` (plain Apache and nginx serve nothing at `/about`); one that links to `/about` gets `/about`. `--clean-urls` forces the second.
+- **Dates.** Hand-written HTML that Git tracks is dated from Git, file by file. A build output Git ignores gets no `lastmod`: built files don't say when their content changed, and a build date would be false.
+- `--add /press,/jobs` lists addresses no HTML file holds.
+- With `--images`, each page's `og:image` and `<img>` sources go into an image sitemap. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
 
-With `--images`, each page's `og:image` and `<img>` sources go into an image sitemap. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
+## Single-page apps
+
+A Vite or Create React App build is one `index.html`; its pages live in your router. `init` reads them from the router's table and adds static mode to your `build` script:
+
+```sh
+npx maisongr-sitemap init --site https://www.example.com
+```
+
+It reads React Router, Vue Router, TanStack Router, Solid Router, Wouter, Preact Router and svelte-spa-router, in route objects (`{ path: "docs", children: [...] }`) and `<Route path>` elements, nested routes joined. Dynamic routes (`/blog/:slug`) and sign-in or account pages are left out and named; list a dynamic route's pages with `--add` in the build script.
+
+Your host must serve `index.html` for paths it has no file for (the usual single-page app setting on Netlify, Vercel, Cloudflare Pages and the rest), so every listed page answers.
+
+## Any site, in any language
+
+For a site no file describes, PHP, Python, Ruby, Go, a CMS, `crawl` reads it the way a search engine does: from the home page, along its own links.
+
+```sh
+npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://www.example.com
+```
+
+- `--out` is the folder your server serves files from (`public/` in Laravel and Symfony, the web root in WordPress). The files are the same as static mode's: `sitemap.xml` and the page at `/sitemap/`.
+- `--site` is the public address, when you crawl a local or staging copy. Without it, the address crawled is the one listed.
+- It follows `robots.txt`, `noindex` (in the page or its `X-Robots-Tag` header), `nofollow`, canonicals, redirects and `hreflang` alternates. It leaves out sign-in and account pages, and addresses with a query string, which search engines treat as copies.
+- **Dates** come only from what each page states: `article:modified_time`, `dateModified` in its JSON-LD, or a `Last-Modified` header. A header that says "now" on every response is ignored.
+- `--max 5000` stops after that many pages (default 10,000). It reads four pages at a time, gently.
+
+Run it again whenever content changes, after a deploy or from a daily cron, so the list stays current. It needs Node 20.9 or later on the machine that runs it, not on your server.
 
 ## Telling search engines
 
@@ -292,7 +323,8 @@ With `--images`, each page's `og:image` and `<img>` sources go into an image sit
 
 ## Limits
 
-- **Dynamic routes** are listed only when the route is given their values through `params`. The build report names every route that needs them.
+- **Dynamic routes** are listed only when the route is given their values through `params`, or by the page's own `generateStaticParams` or `getStaticPaths`. The build report names every route that needs them.
+- **`crawl` finds only what is linked.** A page nothing links to, or one reached only by a form or a script, isn't found. Link it, or add it to the site's navigation or footer.
 - **The URL is the language code.** An Astro locale written as `{ path: "spanish", codes: ["es"] }` is listed with `hreflang="spanish"`. Pass `locales` to the route to correct it.
 
 ## Requirements

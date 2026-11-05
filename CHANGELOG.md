@@ -2,6 +2,24 @@
 
 All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Every kind of site, tested on real projects: a Vite app, a Pages Router project, Eleventy, a hand-written HTML site and a server that renders each page on request.
+
+### Added
+
+- `crawl <url> --out <dir>`: a sitemap for a site in any language (PHP, Python, Ruby, Go, a CMS), read the way a search engine reads it. It follows `robots.txt`, `noindex` and `X-Robots-Tag`, `nofollow`, canonicals, redirects and `hreflang`, and dates a page only from what it states.
+- Single-page apps: `init` sets up Vite and Create React App projects, and static mode lists the pages their router declares (React Router, Vue Router, TanStack, Solid, Wouter, Preact Router, svelte-spa-router), nested routes joined.
+- Pages Router pages are listed from their own `getStaticPaths`.
+- Static mode dates hand-written HTML from Git, takes `--add` for addresses no file holds, and `--clean-urls`.
+- `init --site` for a static generator with a `build` script (Eleventy and the like) adds static mode to it.
+
+### Fixed
+
+- Static mode lists `/about.html` when the site links to it that way, instead of an `/about` that plain Apache and nginx don't serve.
+- Static mode names the site from `og:site_name` or the part its titles share, not the first word of the home page's title.
+- `init --site` is written into the route of a site with a server, and `init` no longer says "App Router" for a project that only has the Pages Router.
+
 ## [1.1.0] - 2026-11-05
 
 Found and fixed by moving four production sites onto the package.
