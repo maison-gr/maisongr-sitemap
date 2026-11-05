@@ -112,7 +112,7 @@ function printReport(r: BuildReport, pages = true) {
   u.ok(`Theme: ${r.theme.name}`, `${r.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${r.theme.fonts.map((f) => `${f.family} (${f.role})`).join(", ") || "system"}`);
   if (r.missedFonts.length) u.warn(`Fonts not brought in: ${r.missedFonts.join(", ")}`, "system fonts are used instead");
   if (r.fromPages?.length) {
-    u.ok(`${plural(r.fromPages.length, "dynamic route")} listed from their own static params`);
+    u.ok(`${plural(r.fromPages.length, "dynamic route")} listed from ${r.fromPages.length === 1 ? "its" : "their"} own static params`);
     u.list(r.fromPages.map((path) => ({ path })));
   }
   if (r.skipped.length) {
@@ -121,7 +121,7 @@ function printReport(r: BuildReport, pages = true) {
   }
   if (r.needParams.length) {
     u.heading("Needs values", r.needParams.length);
-    u.warn(`${plural(r.needParams.length, "dynamic route")} not listed yet`, "give their values in the route file's params");
+    u.warn(`${plural(r.needParams.length, "dynamic route")} not listed yet`, `give ${r.needParams.length === 1 ? "its" : "their"} values in the route file's params`);
     u.list(r.needParams.map((path) => ({ path })));
   }
 }
@@ -396,7 +396,7 @@ async function build() {
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   if (report.rebuilt) u.warn(`maisongr-sitemap: ${REBUILT}`, REBUILT_NOTE);
   u.ok(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated`, `→ ${rel(report.manifestPath)}`);
-  if (report.needParams.length) u.warn(`${plural(report.needParams.length, "dynamic route")} not listed yet: ${report.needParams.join(", ")}`, "give their values in params");
+  if (report.needParams.length) u.warn(`${plural(report.needParams.length, "dynamic route")} not listed yet: ${report.needParams.join(", ")}`, `give ${report.needParams.length === 1 ? "its" : "their"} values in params`);
 }
 
 function runStatic() {

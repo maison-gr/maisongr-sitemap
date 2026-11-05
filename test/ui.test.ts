@@ -155,6 +155,9 @@ describe("what a person sees from each command", () => {
     expect(code).toBe(0); // a warning never fails the command
     expect(out).toContain("  ! Site address not found");
     expect(out).toContain("  ! No robots.txt names the sitemap.");
+    // One route is "its", several are "their".
+    const one = await run(["init", "--offline"], project({ ...NEXT, "app/blog/[slug]/page.tsx": "" }));
+    expect(one.out).toContain("1 dynamic route not listed yet  give its values in the route file's params");
     expect(out).toContain("✓ Done · 2 to look at above");
   });
 
