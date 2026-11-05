@@ -12,7 +12,13 @@ const HELP = `@maison-gr/sitemap
                                      For sites with no server: write sitemap.xml and /sitemap/ into <dir>
 
   Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
+            --version   print the version          --help        print this
 `;
+
+/** The package's own version, from the package.json beside dist/ (or src/). */
+const version = () => JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version as string;
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export type Io = { out: (s: string) => void; err: (s: string) => void };
 
@@ -52,7 +58,7 @@ export const GET = sitemap({
 `;
 
 function printReport(r: BuildReport) {
-  say(`  ${r.routes} pages found, ${r.dated} dated from Git`);
+  say(`  ${plural(r.routes, "page")} found, ${r.dated} dated from Git`);
   if (r.locales) say(`  Languages: ${r.locales.list.join(", ")} (x-default: ${r.locales.default})`);
   say(`  Site: ${r.site ?? "not found; the request's address is used (set SITEMAP_SITE_URL or pass site)"}`);
   say(`  Theme: ${r.theme.name} · ${r.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${r.theme.fonts.map((f) => `${f.family} (${f.role})`).join(", ") || "system"}`);
@@ -93,7 +99,21 @@ async function init() {
   for (const clash of ["sitemap.ts", "sitemap.js", "sitemap.tsx"]) {
     if (existsSync(join(root, appDir, clash))) fail(`${appDir}/${clash} already serves /sitemap.xml. Remove it first; this replaces it.`);
   }
+  if (next.pagesDir) {
+    for (const ext of ["js", "jsx", "ts", "tsx"]) {
+      for (const clash of [`sitemap.xml.${ext}`, `sitemap.xml/index.${ext}`]) {
+        if (existsSync(join(root, next.pagesDir, clash))) fail(`${next.pagesDir}/${clash} already serves /sitemap.xml. Remove it first; this replaces it.`);
+      }
+    }
+  }
   if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would shadow the route. Remove it first; this replaces it.");
+  const pkg = readPackage(root);
+  if (pkg?.dependencies?.["next-sitemap"] || pkg?.devDependencies?.["next-sitemap"]) {
+    fail(
+      "next-sitemap writes public/sitemap.xml after each build, which would shadow this route.\n" +
+        "Remove it and its postbuild script first. Keep a robots.txt that names /sitemap.xml (app/robots.ts or public/robots.txt).",
+    );
+  }
 
   const ts = existsSync(join(root, "tsconfig.json"));
   const route = join(root, appDir, "sitemap.xml", ts ? "route.ts" : "route.js");
@@ -132,7 +152,7 @@ async function build() {
   const appDir = next.appDir ?? (next.srcDir ? "src/app" : "app");
   if (!existsSync(join(root, appDir, "sitemap.xml"))) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
   const report = await buildNext(root, next, { offline: flag("offline") });
-  say(`@maison-gr/sitemap: ${report.routes} pages, ${report.dated} dated → ${rel(manifestPathOf(root, appDir))}`);
+  say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(manifestPathOf(root, appDir))}`);
 }
 
 function runStatic() {
@@ -141,7 +161,7 @@ function runStatic() {
   if (!dir || !existsSync(join(root, dir))) fail("Usage: maisongr-sitemap static <build-dir> --site https://your.site");
   if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at: --site https://your.site");
   const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit") });
-  say(`\n  ${report.pages} pages · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
+  say(`\n  ${plural(report.pages, "page")} · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
   for (const s of report.skipped) say(`  Left out ${s.path}  ${s.reason}`);
   for (const f of report.written) say(`  Wrote ${dir}/${f}`);
   say(`\n  A static host cannot tell browsers from crawlers, so the designed page lives at /sitemap/ and /sitemap.xml is styled with CSS.\n`);
@@ -158,10 +178,12 @@ export async function main(
   io = streams;
   try {
     const command = args[0];
-    if (command === "init") await init();
+    if (command === "--version" || command === "-v") say(version());
+    else if (command === undefined || command === "help" || command === "--help" || command === "-h") say(HELP);
+    else if (command === "init") await init();
     else if (command === "build") await build();
     else if (command === "static") runStatic();
-    else say(HELP);
+    else fail(`Unknown command "${command}".\n\n${HELP}`);
     return 0;
   } catch (error) {
     if (!(error instanceof Exit)) throw error;

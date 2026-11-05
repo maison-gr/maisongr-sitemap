@@ -35,7 +35,16 @@ describe("init", () => {
     expect(readFileSync(join(root, "app/sitemap.xml/route.js"), "utf8")).toContain('export const dynamic = "force-dynamic"');
     expect(JSON.parse(readFileSync(join(root, "app/sitemap.xml/manifest.json"), "utf8")).routes).toEqual([{ pattern: "/" }]);
     expect(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).scripts.build).toBe("maisongr-sitemap build && next build");
-    expect(out).toMatch(/\b1 page/);
+    expect(out).toContain("1 page found");
+  });
+
+  it("refuses when next-sitemap or a Pages Router sitemap would shadow or clash with the route", async () => {
+    const withNextSitemap = project({ ...NEXT, "package.json": '{"dependencies":{"next":"15"},"devDependencies":{"next-sitemap":"4"}}' });
+    expect((await run(["init", "--offline"], withNextSitemap)).err).toContain("next-sitemap writes public/sitemap.xml");
+    const withPagesSitemap = project({ ...NEXT, "pages/sitemap.xml.ts": "export default function S() {}" });
+    const result = await run(["init", "--offline"], withPagesSitemap);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("pages/sitemap.xml.ts already serves /sitemap.xml");
   });
 
   it("refuses to replace a sitemap route that is not its own, and changes nothing", async () => {
@@ -52,5 +61,16 @@ describe("help", () => {
     const { code, out } = await run([], project({}));
     expect(code).toBe(0);
     expect(out).toContain("maisongr-sitemap init");
+  });
+
+  it("prints the package's version", async () => {
+    const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    expect((await run(["--version"], project({}))).out.trim()).toBe(version);
+  });
+
+  it("fails on an unknown command instead of passing silently in a script", async () => {
+    const { code, err } = await run(["biuld"], project({}));
+    expect(code).toBe(1);
+    expect(err).toContain('Unknown command "biuld"');
   });
 });
