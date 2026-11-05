@@ -128,10 +128,26 @@ describe("what a person sees from each command", () => {
     expect(code).toBe(0);
     expect(err).toBe("");
     expect(out).toMatch(/^\n {2}maisongr-sitemap \d+\.\d+\.\d+ · init\n/);
-    for (const section of ["\n  Found\n", "\n  Wrote\n", "\n  Next\n"]) expect(out).toContain(section);
+    for (const section of ["\n  Found\n", "\n  Wrote\n", "\n  Next\n", "\n  You can also\n"]) expect(out).toContain(section);
+    expect(out).toContain("→ npx maisongr-sitemap build  re-read pages");
+    expect(out).toContain("→ npx maisongr-sitemap --help  every command and option");
+    expect(out.indexOf("You can also")).toBeLessThan(out.indexOf("✓ Done"));
     expect(out).toContain("  ✓ 1 page found  0 dated from Git");
     expect(out).toContain("  ✓ Site: https://a.dev");
     expect(out).toMatch(/\n {2}✓ Done \d+m?s\n/);
+  });
+
+  it("init run again keeps the route, and adds a --site it was missing instead of claiming to write it", async () => {
+    const root = project(NEXT);
+    await run(["init", "--offline"], root);
+    const again = await run(["init", "--offline"], root);
+    expect(again.out).toContain("✓ app/sitemap.xml/route.js  kept: already there");
+    const sited = await run(["init", "--offline", "--site", "https://a.dev"], root);
+    expect(sited.out).toContain("✓ app/sitemap.xml/route.js  updated: site set to https://a.dev");
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(join(root, "app/sitemap.xml/route.js"), "utf8")).toContain('  manifest,\n  site: "https://a.dev",\n');
+    const other = await run(["init", "--offline", "--site", "https://b.dev"], root);
+    expect(other.out).toContain("! app/sitemap.xml/route.js  kept: it names https://a.dev; change its site line to use https://b.dev");
   });
 
   it("warnings: each one marked, and counted at the end", async () => {
@@ -147,7 +163,7 @@ describe("what a person sees from each command", () => {
     expect(code).toBe(1);
     expect(out).not.toContain("Done");
     expect(err).toContain("  ✗ No site found in this folder.");
-    expect(err).toContain("    maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site");
+    expect(err).toContain("    npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site");
   });
 
   it("a mistyped command suggests the one meant", async () => {

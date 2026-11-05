@@ -163,13 +163,26 @@ async function initServer(fw: ServerKind) {
   mkdirSync(dirname(route), { recursive: true });
   // --site goes in the route itself, so every later build keeps it.
   const source = routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) });
+  const siteLine = given ? `  site: ${JSON.stringify(trimSlashes(given))},\n` : "";
+  let routeNote: { text: string; warn?: boolean } | undefined;
   try {
-    writeFileSync(route, given ? source.replace("  manifest,\n", `  manifest,\n  site: ${JSON.stringify(trimSlashes(given))},\n`) : source, { flag: "wx" });
+    writeFileSync(route, given ? source.replace("  manifest,\n", `  manifest,\n${siteLine}`) : source, { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    // Run again: the route is the person's now. Only a missing site address is added to it.
+    const current = readFileSync(route, "utf8");
+    const named = current.match(/^\s*site:\s*["'`]([^"'`]+)["'`]/m)?.[1];
+    if (!given) routeNote = { text: "kept: already there" };
+    else if (named === trimSlashes(given)) routeNote = { text: "kept: already there, with this site" };
+    else if (named) routeNote = { text: `kept: it names ${named}; change its site line to use ${trimSlashes(given)}`, warn: true };
+    else if (current.includes("  manifest,\n")) {
+      writeFileSync(route, current.replace("  manifest,\n", `  manifest,\n${siteLine}`));
+      routeNote = { text: `updated: site set to ${trimSlashes(given)}` };
+    } else routeNote = { text: `kept: add site: "${trimSlashes(given)}" to its options yourself`, warn: true };
   }
   u.heading("Wrote");
-  u.ok(rel(route));
+  if (routeNote?.warn) u.warn(rel(route), routeNote.text);
+  else u.ok(rel(route), routeNote?.text);
   u.ok(rel(report.manifestPath), "commit it: shallow CI clones keep its dates");
   if (report.theme.fonts.length) u.ok(`${publicDir}/_sitemap/`, "the page's fonts, served from your own domain");
   u.ok("package.json", editScripts((s) => withBuildStep(s, BUILD[fw.kind])));
@@ -189,7 +202,7 @@ function initStatic(fw: Extract<ServerKind, { kind: "astro" | "sveltekit" | "nux
   const site = value("site") ?? configuredSite(root, fw.kind);
   const why = { astro: "it has no adapter", sveltekit: "it uses adapter-static", nuxt: "it is built with nuxt generate" }[fw.kind];
   if (!site || !/^https?:\/\//.test(site)) {
-    fail(`${LABEL[fw.kind]} builds to static files here (${why}). Static mode writes the sitemap into ./${out} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
+    fail(`Give the address the site is served at.\n${LABEL[fw.kind]} builds to static files here (${why}), so the sitemap is written into ./${out} after each build, and it needs the site's public address:\n  npx maisongr-sitemap init --site https://your.site`);
   }
   refuseClashes(fw, fw.kind === "sveltekit" ? "static" : "public");
   u.subject(`${LABEL[fw.kind]} ${fw.version ?? ""} · static build (${why})`);
@@ -251,7 +264,7 @@ async function initNode(found: Extract<ReturnType<typeof detect>, { kind: "node"
 function initSpa(found: Extract<ReturnType<typeof detect>, { kind: "spa" }>) {
   const site = value("site") ?? findSite(sourceFiles(root));
   if (!site || !/^https?:\/\//.test(site)) {
-    fail(`${found.name} single-page app. Static mode writes the sitemap into ./${found.outDir} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
+    fail(`Give the address the site is served at.\nThis ${found.name} single-page app is built to ./${found.outDir}; the sitemap is written there after each build, and it needs the site's public address:\n  npx maisongr-sitemap init --site https://your.site`);
   }
   if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would be overwritten by this one. Remove it first; this replaces it.");
   u.subject(`${found.name} · single-page app, built to ./${found.outDir}`);
@@ -270,14 +283,31 @@ function initSpa(found: Extract<ReturnType<typeof detect>, { kind: "spa" }>) {
   u.heading("Next");
   if (!dependsOn("maisongr-sitemap")) u.next(u.code("npm install --save-dev maisongr-sitemap"));
   const robots = join(root, "public", "robots.txt");
-  if (!existsSync(robots) || !/sitemap/i.test(readFileSync(robots, "utf8"))) u.warn(`public/robots.txt does not name the sitemap. Add ${u.code(`"Sitemap: ${trimSlashes(site!)}/sitemap.xml"`)}`);
+  if (!existsSync(robots)) u.warn(`No public/robots.txt. Add one that names the sitemap: ${u.code(`"Sitemap: ${trimSlashes(site!)}/sitemap.xml"`)}`);
+  else if (!/sitemap/i.test(readFileSync(robots, "utf8"))) u.warn(`public/robots.txt does not name the sitemap. Add ${u.code(`"Sitemap: ${trimSlashes(site!)}/sitemap.xml"`)}`);
   u.next("Check that your host serves index.html for unknown paths", "the usual single-page app setting, so every listed page answers");
 }
 
+/** After a first set-up: the other things the tool does, and where to find every command. */
+function whatElse() {
+  const found = detect(root);
+  const rebuilds = found.kind === "node" || ((found.kind === "next" || found.kind === "astro" || found.kind === "sveltekit" || found.kind === "nuxt") && (found.kind === "next" || found.server));
+  u.heading("You can also");
+  if (rebuilds) u.next(u.code("npx maisongr-sitemap build"), "re-read pages, dates and theme now; your build already runs it");
+  u.next(u.code("npx maisongr-sitemap indexnow --site <url> --key <key>"), "after a deploy, tell Bing and the other IndexNow engines what changed");
+  u.next(u.code("npx maisongr-sitemap --help"), "every command and option");
+  u.next(u.code("https://github.com/maison-gr/sitemap#readme"), "the full guide");
+}
+
 async function init() {
+  await setUp();
+  whatElse();
+}
+
+async function setUp() {
   const found = detect(root);
   if (found.kind === "unsupported") {
-    fail(`${found.name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
+    fail(`${found.name} has no adapter of its own yet.\nBuild the site, then write the sitemap into its build folder:\n  npx maisongr-sitemap static <build-dir> --site https://your.site`);
   }
   if (found.kind === "node") return initNode(found);
   if (found.kind === "spa") return initSpa(found);
@@ -297,7 +327,7 @@ async function init() {
       return;
     }
     fail(
-      `A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site` +
+      `Give the address the site is served at.\nThis is a static site in ./${found.outDir}; write its sitemap with:\n  npx maisongr-sitemap static ${found.outDir} --site https://your.site` +
         (pkg?.scripts?.build ? `\nOr add --site https://your.site to init, to run it after every build.` : ""),
     );
   }
@@ -306,7 +336,7 @@ async function init() {
       "No site found in this folder.\n" +
         "init reads Next.js, Astro, SvelteKit, Nuxt, Express, Vite and Create React App projects, and static sites with an index.html.\n" +
         "Run it from your project's folder, or, for a site in another language (PHP, Python, Ruby…):\n" +
-        "  maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site",
+        "  npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site",
     );
   }
   const fw = found as ServerKind;
@@ -441,7 +471,7 @@ async function runIndexNow() {
   u.ok(`The site serves its key`, keyFile);
 
   const since = flag("all") ? undefined : value("since") ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date.\n  maisongr-sitemap indexnow --since 2026-11-01");
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date.\n  npx maisongr-sitemap indexnow --since 2026-11-01");
   const urls = changedSince(await sitemapUrls(value("sitemap") ?? `${site}/sitemap.xml`), since);
   if (!urls.length) {
     u.ok(`No page ${since ? `changed since ${since}` : "in the sitemap"}`, since ? "pages without a lastmod are sent only with --all" : undefined);
@@ -493,7 +523,7 @@ export async function main(
       if (command !== "build") u.done(Date.now() - started);
     } else {
       const near = Object.keys(COMMANDS).find((c) => distance(c, command) <= 2);
-      fail(`Unknown command "${command}".${near ? `\nDid you mean ${near}?\n  maisongr-sitemap ${near}` : ""}\nmaisongr-sitemap --help lists them all.`);
+      fail(`Unknown command "${command}".${near ? `\nDid you mean ${near}?\n  npx maisongr-sitemap ${near}` : ""}\nnpx maisongr-sitemap --help lists them all.`);
     }
     return 0;
   } catch (error) {

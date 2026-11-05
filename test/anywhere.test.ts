@@ -183,6 +183,27 @@ describe("crawl", () => {
     expect(readFileSync(join(root, "public/sitemap/index.html"), "utf8")).toContain('href="/c"');
   });
 
+  it("reads minified HTML, whose attributes have no quotes", async () => {
+    const base = await site({
+      "/": () => ({ body: "<html lang=en><head><title>Home | Rivet</title><link rel=alternate hreflang=fr href=/fr/></head><body><a href=/pricing>Pricing</a><a class=nav href=/old rel=nofollow>x</a></body></html>" }),
+      "/pricing": () => ({ body: "<html lang=en><head><meta property=article:modified_time content=2026-11-04></head><body><a href=/copy>c</a><a href=/hidden>h</a></body></html>" }),
+      "/fr/": () => ({ body: "<html lang=fr><body></body></html>" }),
+      "/copy": () => ({ body: "<html><head><link rel=canonical href=/pricing></head></html>" }),
+      "/hidden": () => ({ body: "<html><head><meta name=robots content=noindex></head></html>" }),
+      "/old": () => ({ body: "<html></html>" }),
+    });
+    const report = await crawl(`${base}/`, { site: "https://rivet.example" });
+    expect(report.entries.map((e) => [new URL(e.loc).pathname, e.lang, e.lastmod])).toEqual([
+      ["/", "en", undefined],
+      ["/fr/", "fr", undefined],
+      ["/pricing", "en", "2026-11-04"],
+    ]);
+    expect(report.skipped).toEqual([
+      { path: "/copy", reason: "canonical is /pricing" },
+      { path: "/hidden", reason: "noindex" },
+    ]);
+  });
+
   it("reads robots.txt as crawlers do", () => {
     const allowed = robotsRules("User-agent: Googlebot\nDisallow: /\n\nUser-agent: *\nDisallow: /private\nAllow: /private/press\n");
     expect(allowed("/")).toBe(true);

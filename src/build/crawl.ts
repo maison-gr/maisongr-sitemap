@@ -2,7 +2,7 @@ import { trimSlashes } from "../entries.js";
 import type { Entry, Theme } from "../types.js";
 import { styleBlocks } from "./project.js";
 import { privateOf } from "./route-rules.js";
-import { pageFacts, themeOf } from "./static.js";
+import { attr, holds, pageFacts, themeOf } from "./static.js";
 
 /**
  * For a site no file describes (PHP, Python, Ruby, Go, a CMS…): reads it the
@@ -28,7 +28,6 @@ export type CrawlReport = { entries: Entry[]; skipped: { path: string; reason: s
 const NOT_PAGES = /\.(?:pdf|jpe?g|png|gif|webp|avif|svg|ico|bmp|css|js|mjs|json|xml|txt|csv|zip|gz|rar|7z|mp4|webm|mov|mp3|wav|ogg|woff2?|ttf|otf|eot|map|docx?|xlsx?|pptx?)$/i;
 const AGENT = "maisongr-sitemap (+https://github.com/maison-gr/sitemap)";
 
-const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
 const tags = (html: string, name: string) => [...html.matchAll(new RegExp(`<${name}\\b[^>]*>`, "gi"))].map((m) => m[0]);
 const unescape = (s: string) => s.replace(/&amp;/g, "&");
 
@@ -63,7 +62,7 @@ export function robotsRules(text: string): (path: string) => boolean {
 
 /** The date a page states for its last change, if it states one. */
 function statedDate(html: string, lastModified: string | null): string | undefined {
-  const meta = tags(html, "meta").find((t) => /(?:property|name|itemprop)\s*=\s*["'](?:article:modified_time|og:updated_time|dateModified|last-modified)["']/i.test(t));
+  const meta = tags(html, "meta").find((t) => ["property", "name", "itemprop"].some((n) => /^(?:article:modified_time|og:updated_time|datemodified|last-modified)$/i.test(attr(t, n) ?? "")));
   const ld = html.match(/"dateModified"\s*:\s*"([^"]+)"/)?.[1];
   for (const value of [meta && attr(meta, "content"), ld]) {
     if (value && !Number.isNaN(Date.parse(value))) return value;
@@ -152,23 +151,23 @@ export async function crawl(start: string, options: CrawlOptions = {}): Promise<
     if (path === startUrl.pathname) home = html;
     pages.push(html);
 
-    const robots = tags(html, "meta").find((t) => /name\s*=\s*["']robots["']/i.test(t));
+    const robots = tags(html, "meta").find((t) => attr(t, "name")?.toLowerCase() === "robots");
     const directives = `${attr(robots ?? "", "content") ?? ""},${res.headers.get("x-robots-tag") ?? ""}`;
     if (!/nofollow/i.test(directives)) {
       for (const a of tags(html, "a")) {
-        if (/rel\s*=\s*["'][^"']*nofollow/i.test(a)) continue;
+        if (holds(a, "rel", "nofollow")) continue;
         const href = attr(a, "href");
         if (href && !href.startsWith("#")) add(pathOf(href, `${origin}${path}`));
       }
     }
     // Language versions named only in hreflang are followed too, as search engines do.
-    for (const link of tags(html, "link").filter((t) => /rel\s*=\s*["']alternate["']/i.test(t) && attr(t, "hreflang"))) {
+    for (const link of tags(html, "link").filter((t) => holds(t, "rel", "alternate") && attr(t, "hreflang"))) {
       const href = attr(link, "href");
       if (href) add(pathOf(href, `${origin}${path}`));
     }
     if (/noindex/i.test(directives)) return void skipped.push({ path, reason: "noindex" });
     // A page whose canonical is another address is a copy: the canonical one is listed instead.
-    const canonical = tags(html, "link").find((t) => /rel\s*=\s*["']canonical["']/i.test(t));
+    const canonical = tags(html, "link").find((t) => holds(t, "rel", "canonical"));
     const canonicalPath = canonical && attr(canonical, "href") ? pathOf(attr(canonical, "href")!, `${origin}${path}`) : null;
     if (canonicalPath !== null && canonicalPath !== path) {
       skipped.push({ path, reason: `canonical is ${canonicalPath}` });
@@ -201,7 +200,7 @@ export async function crawl(start: string, options: CrawlOptions = {}): Promise<
 
   // The theme, from the home page's own stylesheets and <style> blocks.
   const css: string[] = [];
-  for (const link of tags(home, "link").filter((t) => /rel\s*=\s*["']stylesheet["']/i.test(t))) {
+  for (const link of tags(home, "link").filter((t) => holds(t, "rel", "stylesheet"))) {
     const href = attr(link, "href");
     if (!href) continue;
     const url = new URL(unescape(href), `${origin}/`);
@@ -210,7 +209,7 @@ export async function crawl(start: string, options: CrawlOptions = {}): Promise<
     if (res?.ok) css.push(absoluteUrls(await res.text(), url, origin));
   }
   css.push(absoluteUrls(styleBlocks(home), new URL(`${origin}/`), origin));
-  const iconTag = tags(home, "link").find((t) => /rel\s*=\s*["'](?:shortcut )?icon["']/i.test(t));
+  const iconTag = tags(home, "link").find((t) => holds(t, "rel", "icon"));
   const iconHref = iconTag && attr(iconTag, "href");
   const iconUrl = iconHref ? new URL(unescape(iconHref), `${origin}/`) : undefined;
   const icon = iconUrl && iconUrl.origin === origin ? iconUrl.pathname : undefined;

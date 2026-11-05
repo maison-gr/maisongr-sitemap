@@ -22,7 +22,14 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
+/** An attribute's value, in double, single or no quotes (minified HTML drops them): href=/about. */
+export const attr = (tag: string, name: string) => {
+  const m = tag.match(new RegExp(`(?:^|[\\s"'])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i"));
+  return m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+};
+
+/** Whether an attribute holds this word among its words, as rel="alternate icon" holds icon. */
+export const holds = (tag: string, name: string, word: string) => (attr(tag, name) ?? "").toLowerCase().split(/\s+/).includes(word);
 
 /** "about/index.html" → "/about/"; "about.html" → "/about", or "/about.html" where the site links to it that way. */
 function pathOf(file: string, dir: string, keepHtml = false): string {
@@ -41,8 +48,9 @@ function linksKeepHtml(pages: string[]): boolean {
   let withExt = 0;
   let without = 0;
   for (const html of pages) {
-    for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"'#?]+)/gi)) {
-      const href = m[1]!;
+    for (const m of html.matchAll(/<a\b[^>]*>/gi)) {
+      const href = attr(m[0], "href")?.split(/[#?]/)[0];
+      if (!href) continue;
       if (/^[a-z][\w+.-]*:|^\/\//i.test(href)) continue; // another site, mailto:, tel:
       const last = href.split("/").pop()!;
       if (/\.html?$/i.test(last) && !/^index\.html?$/i.test(last)) withExt++;
@@ -61,7 +69,7 @@ const TITLE_SEPARATOR = /\s+[|·—–-]\s+/;
  */
 export function siteNameOf(pages: string[], home: string): string | undefined {
   for (const html of [home, ...pages]) {
-    const meta = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).find((t) => /(?:property|name)\s*=\s*["'](?:og:site_name|application-name)["']/i.test(t));
+    const meta = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).find((t) => ["property", "name"].some((n) => /^(?:og:site_name|application-name)$/i.test(attr(t, n) ?? "")));
     const named = meta && attr(meta, "content")?.trim();
     if (named) return named;
   }
@@ -96,7 +104,7 @@ function siteFonts(css: string): Font[] {
  */
 /** A page's own images: its og:image and <img> sources, not inline data. */
 function imagesIn(html: string, pageUrl: string): string[] {
-  const og = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).filter((t) => /property\s*=\s*["']og:image["']/i.test(t)).map((t) => attr(t, "content"));
+  const og = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).filter((t) => attr(t, "property")?.toLowerCase() === "og:image").map((t) => attr(t, "content"));
   const img = [...html.matchAll(/<img\b[^>]*>/gi)].map((t) => attr(t[0], "src"));
   const urls = [...og, ...img].filter((u): u is string => !!u && !u.startsWith("data:")).map((u) => new URL(u.replace(/&amp;/g, "&"), pageUrl).href);
   return [...new Set(urls)];
@@ -160,13 +168,13 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
 
 /** What one page says about itself: why it is left out, or its entry (language, alternates, images). */
 export function pageFacts(html: string, loc: string, base: string, withImages = false): { skip: string } | { entry: Entry } {
-  const robots = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).find((t) => /name\s*=\s*["']robots["']/i.test(t));
+  const robots = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).find((t) => attr(t, "name")?.toLowerCase() === "robots");
   if (robots && /noindex/i.test(attr(robots, "content") ?? "")) return { skip: "noindex" };
-  if (/<meta[^>]+http-equiv\s*=\s*["']refresh["']/i.test(html)) return { skip: "redirect" };
+  if ([...html.matchAll(/<meta\b[^>]*>/gi)].some((t) => attr(t[0], "http-equiv")?.toLowerCase() === "refresh")) return { skip: "redirect" };
   const lang = attr(html.match(/<html\b[^>]*>/i)?.[0] ?? "", "lang");
   const alternates = [...html.matchAll(/<link\b[^>]*>/gi)]
     .map((t) => t[0])
-    .filter((t) => /rel\s*=\s*["']alternate["']/i.test(t) && attr(t, "hreflang"))
+    .filter((t) => holds(t, "rel", "alternate") && attr(t, "hreflang"))
     .map((t) => ({ hreflang: attr(t, "hreflang")!, href: new URL(attr(t, "href") ?? "/", `${base}/`).href }));
   const images = withImages ? imagesIn(html, loc) : [];
   return { entry: { loc, ...(lang ? { lang } : {}), ...(alternates.length ? { alternates } : {}), ...(images.length ? { images } : {}) } };
