@@ -1,12 +1,33 @@
 # @maison-gr/sitemap
 
-One sitemap, two readers. Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode, with every address as a link and a filter.
+**One sitemap, two readers.** Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode, with every address as a link and a filter.
+
+[![CI](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml/badge.svg)](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1b1a17)](LICENSE)
+![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-1b1a17)
+![Node 20.9+](https://img.shields.io/badge/node-%E2%89%A520.9-1b1a17)
+
+![The same /sitemap.xml: the XML a crawler gets, and the page people get on three different sites, each in its own design.](.github/assets/hero.png)
 
 ```sh
 npx @maison-gr/sitemap init
 ```
 
 `init` detects your framework, finds your pages, dates each one from Git, reads your theme, and writes one route file. There's nothing to design and nothing to keep in sync.
+
+## How it compares
+
+| | **@maison-gr/sitemap** | next-sitemap | @astrojs/sitemap |
+|---|---|---|---|
+| Frameworks | Next.js, Astro, SvelteKit, Nuxt, Express, any `Request`/`Response` server, any static site | Next.js | Astro |
+| What a person sees at `/sitemap.xml` | A page in your site's design | Raw XML | XML styled with your own XSL |
+| `lastmod` | The last commit that changed each page | Build time, by default | What you set |
+| `hreflang` alternates | Read from your routes and i18n config | Configured | From its `i18n` option |
+| Images, videos, news | Yes | Through `transform` | Not documented per page |
+| Several sitemaps | Yes | Yes | Yes |
+| `robots.txt` | Says when it's missing the sitemap | Generates it | No |
+| IndexNow | `maisongr-sitemap indexnow` | No | No |
+| Strict CSP (`default-src 'self'`) | Works as is | Raw XML (nothing to load) | Depends on your XSL |
 
 ## Why
 
