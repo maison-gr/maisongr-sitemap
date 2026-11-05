@@ -86,15 +86,23 @@ export function emptyPageReason(file: string): string | null {
   return null;
 }
 
+/**
+ * Whether a file always says noindex. One that also says index: true chooses
+ * per page (shouldIndex ? { index: true } : { index: false }), so its pages
+ * are listed, and the page decides for each one.
+ */
+const INDEXABLE = /index\s*:\s*true/;
+const saysNoindex = (src: string) => NOINDEX.test(src) && !INDEXABLE.test(src);
+
 /** A page or layout is noindex when it says so, or calls a local helper named for hiding that does. */
 export function isNoindex(root: string, file: string): boolean {
   const src = read(file);
-  if (NOINDEX.test(src)) return true;
+  if (saysNoindex(src)) return true;
   for (const m of src.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']([^"']+)["']/g)) {
     const names = m[1]!.split(",").map((n) => n.trim().split(/\s+as\s+/)[0]!);
     if (!names.some((n) => HIDING_HELPER.test(n))) continue;
     const target = moduleFile(root, file, m[2]!);
-    if (target && NOINDEX.test(read(target))) return true;
+    if (target && saysNoindex(read(target))) return true;
   }
   return false;
 }

@@ -113,6 +113,19 @@ describe("Next.js routes", () => {
     expect(appRoutes(root, "app").routes.map((r) => r.pattern)).toEqual(["/"]);
   });
 
+  it("keeps a page whose noindex depends on its content, and asks for a dynamic one's values", () => {
+    // Resistaa's shared stories: indexed only when public and long enough.
+    const conditional = "const shouldIndex = data.response.length >= 240;\nexport const metadata = { robots: shouldIndex ? { index: true, follow: true } : { index: false, follow: true } };";
+    const root = project({
+      "app/r/[slug]/page.tsx": conditional,
+      "app/story/page.tsx": conditional,
+      "app/hidden/page.tsx": "export const metadata = { robots: { index: false } };",
+    });
+    const { routes, skipped } = appRoutes(root, "app");
+    expect(routes.map((r) => r.pattern).sort()).toEqual(["/r/[slug]", "/story"]);
+    expect(skipped).toEqual([{ pattern: "/hidden", reason: "noindex" }]);
+  });
+
   it("reads the Pages Router", () => {
     const root = project({ "pages/index.tsx": "", "pages/_app.tsx": "", "pages/404.tsx": "", "pages/api/x.ts": "", "pages/docs/[id].tsx": "", "pages/about.mdx": "" });
     expect(pagesRoutes(root, "pages").routes.map((r) => r.pattern).sort()).toEqual(["/", "/about", "/docs/[id]"]);
