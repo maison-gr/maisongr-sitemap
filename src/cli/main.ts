@@ -4,9 +4,11 @@ import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { buildNode, nodePaths, type ModuleFormat } from "../build/node-build.js";
-import { sourceFiles } from "../build/project.js";
+import { findSite, sourceFiles } from "../build/project.js";
 import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
-import { buildStatic } from "../build/static.js";
+import { spaRoutes } from "../build/spa-routes.js";
+import { crawl } from "../build/crawl.js";
+import { buildStatic, writeSitemapFiles } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
 import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
@@ -16,6 +18,9 @@ const HELP = `maisongr-sitemap
   maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
   maisongr-sitemap static <dir> --site <url>
                                      For sites with no server: write sitemap.xml and /sitemap/ into <dir>
+                                     --add /a,/b  more paths   --clean-urls  /about, never /about.html
+  maisongr-sitemap crawl <url> --out <dir> [--site <url>] [--max <pages>]
+                                     Any other site (PHP, Python, Ruby, a CMS): read it as a search engine does
   maisongr-sitemap indexnow --site <url> --key <key>
                                      Tell Bing and the other IndexNow engines which pages changed (after a deploy)
                                      --since <YYYY-MM-DD> (default: yesterday)  --all  --dry-run  --sitemap <file or url>
@@ -135,14 +140,19 @@ async function initServer(fw: ServerKind) {
   refuseClashes(fw, publicDir);
   const route = join(root, routePath(fw, existsSync(join(root, "tsconfig.json"))));
 
-  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""}${fw.kind === "next" ? ` · App Router${fw.pagesDir ? " + Pages Router" : ""}` : ""}`);
+  const routers = fw.kind === "next" ? [fw.appDir && "App Router", fw.pagesDir && "Pages Router"].filter(Boolean).join(" + ") : "";
+  say(`\n${LABEL[fw.kind]} ${fw.version ?? ""}${routers ? ` · ${routers}` : ""}`);
+  const given = value("site");
+  if (given && !/^https?:\/\//.test(given)) fail("--site takes the full address: --site https://your.site");
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
-  printReport(report);
+  printReport(given ? { ...report, site: trimSlashes(given) } : report);
 
   // "wx" creates the route only if it isn't there, in one step: no gap between checking and writing.
   mkdirSync(dirname(route), { recursive: true });
+  // --site goes in the route itself, so every later build keeps it.
+  const source = routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) });
   try {
-    writeFileSync(route, routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) }), { flag: "wx" });
+    writeFileSync(route, given ? source.replace("  manifest,\n", `  manifest,\n  site: ${JSON.stringify(trimSlashes(given))},\n`) : source, { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
@@ -153,7 +163,7 @@ async function initServer(fw: ServerKind) {
 
   say();
   if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install maisongr-sitemap`);
-  robotsHint(fw, publicDir, report.site);
+  robotsHint(fw, publicDir, given ? trimSlashes(given) : report.site);
   if (fw.kind === "next" && ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "src/middleware.ts", "src/proxy.ts"].some((f) => existsSync(join(root, f)))) {
     say(`  Check: your middleware must let /sitemap.xml and /_sitemap/ through untouched (no locale redirect).`);
   }
@@ -221,14 +231,48 @@ async function initNode(found: Extract<ReturnType<typeof detect>, { kind: "node"
   say(`  Open /sitemap.xml in a browser: the page. curl it: the XML.\n`);
 }
 
+/** A single-page app: one index.html, its pages in the router's table, so static mode runs after each build and reads that table. */
+function initSpa(found: Extract<ReturnType<typeof detect>, { kind: "spa" }>) {
+  const site = value("site") ?? findSite(sourceFiles(root));
+  if (!site || !/^https?:\/\//.test(site)) {
+    fail(`${found.name} single-page app. Static mode writes the sitemap into ./${found.outDir} after each build.\nGive the address the site is served at:\n  maisongr-sitemap init --site https://your.site`);
+  }
+  if (existsSync(join(root, "public", "sitemap.xml"))) fail("public/sitemap.xml would be overwritten by this one. Remove it first; this replaces it.");
+  say(`\n${found.name} · single-page app, built to ./${found.outDir}`);
+  const routes = spaRoutes(root);
+  if (routes) {
+    say(`  ${plural(routes.paths.length, "page")} found in the ${routes.router} routes`);
+    for (const s of routes.skipped) say(`    Left out ${s.path}  ${s.reason}`);
+  } else say(`  No client-side router found: only the home page is listed. Add others with --add in the build script.`);
+  say(`  Build  ${editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site!), "vite build"))}`);
+  say(`\n  After each build: ./${found.outDir}/sitemap.xml for search engines (styled with CSS), and the designed page at /sitemap/ for people.`);
+  if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
+  const robots = join(root, "public", "robots.txt");
+  if (!existsSync(robots) || !/sitemap/i.test(readFileSync(robots, "utf8"))) say(`  Add:   public/robots.txt naming "Sitemap: ${trimSlashes(site!)}/sitemap.xml"`);
+  say(`  Check: the host serves index.html for unknown paths (the usual single-page app setting), so every listed page answers.\n`);
+}
+
 async function init() {
   const found = detect(root);
   if (found.kind === "unsupported") {
     fail(`${found.name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
   }
   if (found.kind === "node") return initNode(found);
+  if (found.kind === "spa") return initSpa(found);
   if (found.kind === "static") {
-    fail(`A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site`);
+    const site = value("site");
+    const pkg = readPackage(root);
+    // A generator with a build script (Eleventy, Hugo through npm…): the sitemap is written after each build.
+    if (pkg?.scripts?.build && site && /^https?:\/\//.test(site) && found.outDir !== ".") {
+      say(`\nStatic site, built to ./${found.outDir}`);
+      say(`  Build  ${editScripts((s) => withStaticStep(s, found.outDir, trimSlashes(site), "npm run build"))}`);
+      if (!dependsOn("maisongr-sitemap")) say(`  Next:  npm install --save-dev maisongr-sitemap`);
+      return say(`  After each build: ./${found.outDir}/sitemap.xml, and the designed page at /sitemap/.\n`);
+    }
+    fail(
+      `A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site` +
+        (pkg?.scripts?.build ? `\nOr add --site https://your.site to init, to run it after every build.` : ""),
+    );
   }
   if (found.kind === "unknown") fail("No supported framework found here (Next.js, Astro, SvelteKit, Nuxt, Express, or a static build with index.html).");
   const fw = found as ServerKind;
@@ -267,11 +311,38 @@ function runStatic() {
   const site = value("site") ?? process.env.SITEMAP_SITE_URL;
   if (!dir || !existsSync(join(root, dir))) fail("Usage: maisongr-sitemap static <build-dir> --site https://your.site");
   if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at: --site https://your.site");
-  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images") });
-  say(`\n  ${plural(report.pages, "page")} · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
-  for (const s of report.skipped) say(`  Left out ${s.path}  ${s.reason}`);
+  // A single-page app's pages are in its router's table, not in the build output.
+  const routes = spaRoutes(root);
+  const added = (value("add") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images"), cleanUrls: flag("clean-urls"), extra: [...(routes?.paths ?? []), ...added] });
+  say(`\n  ${plural(report.pages, "page")}${routes ? ` (${routes.router} routes included)` : ""} · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
+  for (const s of [...report.skipped, ...(routes?.skipped ?? [])]) say(`  Left out ${s.path}  ${s.reason}`);
   for (const f of report.written) say(`  Wrote ${dir}/${f}`);
   say(`\n  A static host cannot tell browsers from crawlers, so the designed page lives at /sitemap/ and /sitemap.xml is styled with CSS.\n`);
+}
+
+/** Any site at all (PHP, Python, Ruby, a CMS): read it as a search engine would, and write the sitemap files where its server serves files. */
+async function runCrawl() {
+  const start = args[1];
+  const out = value("out");
+  const site = value("site");
+  if (!start || !/^https?:\/\//.test(start) || !out) fail("Usage: maisongr-sitemap crawl <url> --out <public dir> [--site https://your.site]");
+  if (site && !/^https?:\/\//.test(site)) fail("--site takes the full address: --site https://your.site");
+  if (!existsSync(join(root, out!))) fail(`${out} does not exist. Give the folder your server serves files from (public/, the web root…).`);
+  const max = value("max") ? Number(value("max")) : undefined;
+  if (max !== undefined && !(max > 0)) fail("--max takes a number of pages: --max 5000");
+  say(`\n  Reading ${start}…`);
+  const report = await crawl(start!, { site, max, images: flag("images") });
+  if (!report.entries.length) fail(`No page could be listed from ${start}. Is the site running, and is its home page public?`);
+  const written = writeSitemapFiles(join(root, out!), report.entries, report.theme, !flag("no-credit"));
+  const dated = report.entries.filter((e) => e.lastmod).length;
+  say(`  ${plural(report.entries.length, "page")}, ${dated} with a date the page states · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
+  if (report.capped) say(`  Stopped at --max ${max ?? 10000}: raise it to read further.`);
+  for (const s of report.skipped) say(`  Left out ${s.path}  ${s.reason}`);
+  if (report.queries) say(`  Not followed: ${report.queries} address${report.queries === 1 ? "" : "es"} with a query string (?…), which search engines treat as copies.`);
+  for (const f of written) say(`  Wrote ${out}/${f}`);
+  say(`\n  Run it again after content changes (a deploy step or a daily cron), so the list stays current.`);
+  say(`  The designed page is at /sitemap/; /sitemap.xml is styled with CSS for the browsers that open it.\n`);
 }
 
 /** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
@@ -346,6 +417,7 @@ export async function main(
     else if (command === "init") await init();
     else if (command === "build") await build();
     else if (command === "static") runStatic();
+    else if (command === "crawl") await runCrawl();
     else if (command === "indexnow") await runIndexNow();
     else fail(`Unknown command "${command}".\n\n${HELP}`);
     return 0;

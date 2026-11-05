@@ -13,6 +13,8 @@ export type Detected =
   | { kind: "nuxt"; version?: string; pagesDir: string; server: boolean }
   /** A server whose routes live in code: the Node adapter serves the sitemap, with the addresses it is given. */
   | { kind: "node"; name: string }
+  /** A single-page app (Vite, Create React App): one index.html, its pages in a client-side router's table. */
+  | { kind: "spa"; name: string; outDir: string }
   | { kind: "static"; outDir: string }
   | { kind: "unsupported"; name: string }
   | { kind: "unknown" };
@@ -20,7 +22,8 @@ export type Detected =
 /** Frameworks recognised but without their own adapter yet: they can use static mode on their build output. */
 const LATER: [string, string][] = [
   ["@remix-run/react", "Remix"],
-  ["react-router", "React Router"],
+  // React Router's framework mode; the library alone is a single-page app's router.
+  ["@react-router/dev", "React Router"],
   ["gatsby", "Gatsby"],
 ];
 
@@ -79,6 +82,12 @@ export function detect(root: string): Detected {
   for (const [name, label] of [["express", "Express"], ["polka", "Polka"], ["connect", "Connect"]]) {
     if (deps[name!]) return { kind: "node", name: label! };
   }
+  if (deps.vite && existsSync(join(root, "index.html"))) {
+    const outDir = /\boutDir\s*:\s*["'`]([^"'`]+)["'`]/.exec(configOf(root, ["vite.config.ts", "vite.config.js", "vite.config.mts", "vite.config.mjs"])?.source ?? "")?.[1] ?? "dist";
+    const name = deps.vue ? "Vue" : deps["solid-js"] ? "Solid" : deps.svelte ? "Svelte" : deps.preact ? "Preact" : deps.react ? "React" : "Vite";
+    return { kind: "spa", name: `${name} (Vite)`, outDir };
+  }
+  if (deps["react-scripts"]) return { kind: "spa", name: "Create React App", outDir: "build" };
 
   const outDir = BUILD_DIRS.find((d) => existsSync(join(root, d, "index.html")));
   if (outDir) return { kind: "static", outDir };
