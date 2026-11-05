@@ -56,6 +56,14 @@ describe("init", () => {
   });
 });
 
+describe("init on a server whose routes live in code", () => {
+  it("shows the Node adapter instead of scanning", async () => {
+    const { code, err } = await run(["init"], project({ "package.json": '{"dependencies":{"express":"5"}}' }));
+    expect(code).toBe(1);
+    expect(err).toContain('import { sitemap } from "@maison-gr/sitemap/node"');
+  });
+});
+
 describe("help", () => {
   it("prints the commands", async () => {
     const { code, out } = await run([], project({}));

@@ -34,7 +34,14 @@ describe("detect", () => {
   it("knows Next.js, its routers, static builds and what comes later", () => {
     expect(detect(project({ "package.json": '{"dependencies":{"next":"15.5.0"}}', "src/app/page.tsx": "" }))).toMatchObject({ kind: "next", appDir: "src/app" });
     expect(detect(project({ "package.json": '{"dependencies":{"next":"14"}}', "pages/index.tsx": "" }))).toMatchObject({ kind: "next", pagesDir: "pages" });
-    expect(detect(project({ "package.json": '{"dependencies":{"astro":"5"}}' }))).toEqual({ kind: "unsupported", name: "Astro" });
+    expect(detect(project({ "package.json": '{"dependencies":{"astro":"7"}}' }))).toEqual({ kind: "astro", version: "7", pagesDir: "src/pages", server: false });
+    expect(detect(project({ "package.json": '{"dependencies":{"astro":"7"}}', "astro.config.mjs": "export default defineConfig({ adapter: node({ mode: 'standalone' }) })" }))).toMatchObject({ kind: "astro", server: true });
+    expect(detect(project({ "package.json": '{"devDependencies":{"@sveltejs/kit":"3","@sveltejs/adapter-static":"4"}}' }))).toMatchObject({ kind: "sveltekit", server: false });
+    expect(detect(project({ "package.json": '{"devDependencies":{"@sveltejs/kit":"3","@sveltejs/adapter-auto":"8"}}' }))).toMatchObject({ kind: "sveltekit", routesDir: "src/routes", server: true });
+    expect(detect(project({ "package.json": '{"dependencies":{"nuxt":"4"},"scripts":{"build":"nuxt build"}}' }))).toMatchObject({ kind: "nuxt", pagesDir: "app/pages", server: true });
+    expect(detect(project({ "package.json": '{"dependencies":{"nuxt":"3"},"scripts":{"build":"nuxt generate"}}', "pages/index.vue": "" }))).toMatchObject({ kind: "nuxt", pagesDir: "pages", server: false });
+    expect(detect(project({ "package.json": '{"dependencies":{"express":"5"}}' }))).toEqual({ kind: "node", name: "Express" });
+    expect(detect(project({ "package.json": '{"dependencies":{"gatsby":"5"}}' }))).toEqual({ kind: "unsupported", name: "Gatsby" });
     expect(detect(project({ "dist/index.html": "<html></html>" }))).toEqual({ kind: "static", outDir: "dist" });
     expect(detect(project({}))).toEqual({ kind: "unknown" });
   });

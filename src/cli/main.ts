@@ -89,8 +89,16 @@ function addBuildStep(): string {
 
 async function init() {
   const found = detect(root);
-  if (found.kind === "unsupported") {
-    fail(`${found.name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
+  if (found.kind === "unsupported" || found.kind === "astro" || found.kind === "sveltekit" || found.kind === "nuxt") {
+    const name = found.kind === "unsupported" ? found.name : { astro: "Astro", sveltekit: "SvelteKit", nuxt: "Nuxt" }[found.kind];
+    fail(`${name} detected. Its adapter is not out yet; until then, build the site and run:\n  maisongr-sitemap static <build-dir> --site https://your.site`);
+  }
+  if (found.kind === "node") {
+    fail(
+      `${found.name} detected. Its routes live in code, so there is nothing to scan: serve the sitemap with the addresses you have.\n\n` +
+        `  import { sitemap } from "@maison-gr/sitemap/node";\n\n` +
+        `  app.get("/sitemap.xml", sitemap({\n    site: "https://your.site",\n    entries: async () => [{ loc: "/" }, { loc: "/pricing", lastmod: "2026-11-04" }],\n  }));`,
+    );
   }
   if (found.kind === "static") {
     fail(`A static site in ./${found.outDir}. Run:\n  maisongr-sitemap static ${found.outDir} --site https://your.site`);
