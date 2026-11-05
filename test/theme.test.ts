@@ -98,7 +98,13 @@ describe("fonts from next/font", () => {
     const layout = `import localFont from "next/font/local";
       const brand = localFont({ src: "./fonts/Brand.woff2", variable: "--font-brand" });`;
     const [font] = nextFonts(layout, "/proj/app");
-    expect(font).toMatchObject({ kind: "local", family: "brand", role: "body" });
+    expect(font).toMatchObject({ kind: "local", family: "Brand", role: "body" });
+  });
+
+  it("names a local font after its file, not the variable that names its role", () => {
+    const layout = `import localFont from "next/font/local";
+      const display = localFont({ src: "../../fonts/instrument-sans.woff2", variable: "--app-font-display" });`;
+    expect(nextFonts(layout, "/proj/src/app/[lang]")[0]).toMatchObject({ family: "Instrument Sans", role: "display" });
   });
 });
 

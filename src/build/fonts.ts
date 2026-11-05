@@ -58,7 +58,13 @@ export function nextFonts(layoutSource: string, layoutDir: string): FontSource[]
       }));
       if (!files.length) continue;
       const variable = variableOf(opts);
-      const family = variable ? variable.replace(/^--(font-)?/, "").replace(/-/g, " ") : basename(files[0]!.path).replace(/\.\w+$/, "");
+      // Named after its file ("instrument-sans.woff2" → "Instrument Sans"): a variable like --app-font-display names a role, not a font.
+      const family = basename(files[0]!.path)
+        .replace(/\.\w+$/, "")
+        .split(/[-_]+/)
+        .filter(Boolean)
+        .map((w) => w[0]!.toUpperCase() + w.slice(1))
+        .join(" ");
       out.push({ kind: "local", family, role: hintOf(variable, family), files });
     }
   }
