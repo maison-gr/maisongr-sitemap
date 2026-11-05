@@ -64,9 +64,16 @@
     "sitemap.xml",
     "seo",
     "nextjs",
-    "xslt",
+    "astro",
+    "sveltekit",
+    "nuxt",
+    "express",
     "hreflang",
-    "lastmod"
+    "lastmod",
+    "image-sitemap",
+    "video-sitemap",
+    "indexnow",
+    "xslt"
   ],
   "devDependencies": {
     "@types/node": "26.6.6",
