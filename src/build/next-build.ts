@@ -61,6 +61,22 @@ function localesOf(root: string, routes: { pattern: string }[], files: string[])
   return found ? { ...found, ...(prefixed ? { prefix: true } : {}) } : undefined;
 }
 
+const NEXT_CONFIGS = ["next.config.ts", "next.config.mts", "next.config.mjs", "next.config.js", "next.config.cjs"];
+
+/**
+ * basePath and trailingSlash as next.config writes them. Without them every
+ * listed address would redirect, which Search Console reports as an error.
+ * A value computed at runtime (basePath: process.env.X) is not read: pass it
+ * to the route instead.
+ */
+export function nextConfigOf(root: string): { basePath?: string; trailingSlash?: boolean } {
+  const file = NEXT_CONFIGS.map((f) => join(root, f)).find(existsSync);
+  const src = file ? read(file).replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/[^\n]*/g, "$1") : "";
+  const basePath = src.match(/\bbasePath\s*:\s*["'](\/[^"']*?)\/?["']/)?.[1];
+  const trailingSlash = /\btrailingSlash\s*:\s*true\b/.test(src);
+  return { ...(basePath ? { basePath } : {}), ...(trailingSlash ? { trailingSlash } : {}) };
+}
+
 export function layoutOf(root: string, appDir?: string): string | undefined {
   if (!appDir) return undefined;
   return ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"].map((n) => join(root, appDir, n)).find(existsSync);
@@ -125,6 +141,7 @@ export async function buildNext(
     version: 1,
     framework: "next",
     ...(site ? { site } : {}),
+    ...nextConfigOf(root),
     ...(locales ? { locales } : {}),
     routes,
     theme,

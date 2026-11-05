@@ -52,6 +52,10 @@ export type Manifest = {
   version: 1;
   framework: string;
   site?: string;
+  /** The path the site is mounted under (Next.js basePath), e.g. "/docs". */
+  basePath?: string;
+  /** The site serves "/about/" rather than "/about". */
+  trailingSlash?: boolean;
   /** Read from the project on every build, so a new language is never missed. */
   locales?: { list: string[]; default: string; prefix?: boolean };
   routes: Route[];

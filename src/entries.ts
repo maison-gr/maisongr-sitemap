@@ -44,6 +44,8 @@ export type ExpandOptions = {
   params?: Record<string, () => ParamRow[] | Promise<ParamRow[]>>;
   exclude?: (string | RegExp)[];
   trailingSlash?: boolean;
+  /** The path the site is mounted under, e.g. "/docs". `exclude` is matched without it. */
+  basePath?: string;
 };
 
 const SEGMENT = /\[\[?(?:\.\.\.)?([^\]]+)\]\]?/g;
@@ -88,7 +90,12 @@ export function unfilled(routes: Route[], options: Pick<ExpandOptions, "locales"
 
 export async function expand(routes: Route[], options: ExpandOptions): Promise<Entry[]> {
   const site = options.site.replace(/\/+$/, "");
-  const url = (path: string) => `${site}${options.trailingSlash && path !== "/" ? `${path}/` : path}`;
+  const base = options.basePath?.replace(/\/+$/, "") ?? "";
+  const url = (path: string) => {
+    // Under a basePath the home page is "/docs", never "/docs/" (which redirects).
+    const full = base ? (path === "/" ? base : `${base}${path}`) : path;
+    return `${site}${options.trailingSlash && full !== "/" ? `${full}/` : full}`;
+  };
   const out: Entry[] = [];
 
   for (const route of routes) {

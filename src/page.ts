@@ -17,6 +17,8 @@ export type PageOptions = {
   credit?: boolean;
   /** Where the page's stylesheet and script are served. Default: the sitemap's own address. */
   assets?: { css: string; js: string };
+  /** Where the site's name links to. Default "/"; the basePath for a site mounted under one. */
+  home?: string;
 };
 
 const ASSETS = { css: "?asset=page.css", js: "?asset=page.js" };
@@ -70,7 +72,7 @@ ${theme.fonts.flatMap((f) => f.files.slice(0, 1)).map((file) => `<link rel="prel
 </head>
 <body>
 <main class="page">
-<a class="brand" href="/">${esc(theme.name)}</a>
+<a class="brand" href="${esc(options.home ?? "/")}">${esc(theme.name)}</a>
 ${body}
 <footer class="foot"><span>Search engines read the XML version of this list.</span>${options.credit !== false ? `<span>Sitemap by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a></span>` : ""}</footer>
 </main>

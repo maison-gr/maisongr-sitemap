@@ -150,6 +150,18 @@ describe("a full Next.js project", () => {
   });
 });
 
+describe("next.config", () => {
+  it("records basePath and trailingSlash, and ignores them when commented out", async () => {
+    const config = (body: string) => project({ "package.json": '{"dependencies":{"next":"15"}}', "app/page.tsx": "", "next.config.mjs": body });
+    const read = async (root: string) => JSON.parse(readFileSync((await buildNext(root, detect(root) as never, { offline: true })).manifestPath, "utf8"));
+    const on = await read(config(`const nextConfig = { images: { remotePatterns: [{ hostname: "cdn.x" }] }, basePath: "/docs/", trailingSlash: true };\nexport default nextConfig;`));
+    expect(on).toMatchObject({ basePath: "/docs", trailingSlash: true });
+    const off = await read(config(`export default {\n  // basePath: "/docs",\n  /* trailingSlash: true, */\n  reactStrictMode: true,\n};`));
+    expect(off.basePath).toBeUndefined();
+    expect(off.trailingSlash).toBeUndefined();
+  });
+});
+
 describe("languages added by middleware", () => {
   it("prefixes every route when the middleware routes by locale and there is no [locale] folder", async () => {
     const root = project({

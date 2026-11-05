@@ -125,6 +125,20 @@ describe("createSitemap", () => {
     expect(locs(await (await get(extra)).text())).toEqual(["https://www.example.com/press", "https://www.example.com/team"]);
   });
 
+  it("follows the manifest's basePath and trailingSlash, in the XML and on the page", async () => {
+    const mounted = createSitemap({
+      manifest: { ...manifest, basePath: "/docs", trailingSlash: true, routes: [{ pattern: "/" }, { pattern: "/guide" }], locales: undefined },
+      entries: () => [{ loc: "/docs/changelog/" }, { loc: "/docs/drafts/x/" }],
+      exclude: ["/drafts/"],
+    });
+    expect(locs(await (await get(mounted)).text())).toEqual([
+      "https://www.example.com/docs/",
+      "https://www.example.com/docs/guide/",
+      "https://www.example.com/docs/changelog/",
+    ]);
+    expect(await (await get(mounted, "/sitemap.xml", true)).text()).toContain('<a class="brand" href="/docs">');
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

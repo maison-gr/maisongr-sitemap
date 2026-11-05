@@ -87,6 +87,22 @@ describe("expand", () => {
   });
 });
 
+describe("basePath", () => {
+  it("mounts every address under it, the home page without a slash that would redirect", async () => {
+    const routes = [{ pattern: "/" }, { pattern: "/a" }, { pattern: "/drafts" }];
+    const out = await expand(routes, { site, basePath: "/docs", exclude: ["/drafts"] });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/docs`, `${site}/docs/a`]);
+    const slashed = await expand(routes.slice(0, 2), { site, basePath: "/docs", trailingSlash: true });
+    expect(slashed.map((e) => e.loc)).toEqual([`${site}/docs/`, `${site}/docs/a/`]);
+  });
+
+  it("puts the language after it", async () => {
+    const out = await expand([{ pattern: "/[locale]" }], { site, basePath: "/docs", locales: { list: ["en", "fr"], default: "en" } });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/docs/en`, `${site}/docs/fr`]);
+    expect(out[0]!.alternates?.at(-1)).toEqual({ hreflang: "x-default", href: `${site}/docs/en` });
+  });
+});
+
 describe("dateOf", () => {
   it("keeps W3C dates as the day they name and rejects the rest", () => {
     expect(dateOf("2026-11-04")).toBe("2026-11-04");

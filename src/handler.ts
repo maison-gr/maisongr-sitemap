@@ -15,7 +15,10 @@ export type SitemapOptions = {
   entries?: () => EntryInput[] | Promise<EntryInput[]>;
   /** Paths to leave out, from routes and `entries` alike: exact paths, prefixes ("/drafts/") or patterns. */
   exclude?: (string | RegExp)[];
+  /** The site serves "/about/" rather than "/about". Defaults to the manifest's (Next.js `trailingSlash`). */
   trailingSlash?: boolean;
+  /** The path the site is mounted under, e.g. "/docs". Defaults to the manifest's (Next.js `basePath`). */
+  basePath?: string;
   /** Seconds the list of addresses is kept before params and entries run again. Default 3600. */
   revalidate?: number;
   /** Overrides for what was read from the site. */
@@ -64,13 +67,16 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
   const manifest = asManifest(options.manifest);
   const theme = mergeTheme(manifest.theme, options.theme);
   const ttl = (options.revalidate ?? 3600) * 1000;
+  const trailingSlash = options.trailingSlash ?? manifest.trailingSlash;
+  const basePath = options.basePath ?? manifest.basePath;
+  const page = { credit: options.credit, home: basePath || "/" };
   let cache: { at: number; site: string; entries: Promise<Entry[]> } | undefined;
 
   const load = (site: string) => {
     if (!cache || cache.site !== site || Date.now() - cache.at > ttl) {
       const entries = (async () => {
         const locales = options.locales ?? manifest.locales;
-        const fromRoutes = await expand(manifest.routes, { ...options, locales, site });
+        const fromRoutes = await expand(manifest.routes, { ...options, locales, site, trailingSlash, basePath });
         const extra = (options.entries ? await options.entries() : [])
           .map(({ lastmod, ...e }) => {
             const loc = e.loc.startsWith("/") ? `${site}${e.loc}` : e.loc;
@@ -78,7 +84,12 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
             const day = dateOf(lastmod);
             return day ? { ...e, loc, lastmod: day } : { ...e, loc };
           })
-          .filter((e) => !matches(new URL(e.loc).pathname, options.exclude ?? []));
+          .filter((e) => {
+            // exclude is written without the basePath, as for routes.
+            const path = new URL(e.loc).pathname;
+            const own = basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
+            return !matches(own, options.exclude ?? []);
+          });
         const seen = new Set(fromRoutes.map((e) => e.loc));
         return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc))];
       })();
@@ -113,18 +124,18 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
       if (!part) {
         const parts = chunks.map((c, i) => ({ loc: `${site}${url.pathname}?part=${i + 1}`, lastmod: newest(c), count: c.length }));
         return browser
-          ? respond(indexPage(parts, theme, options), "text/html", pageHeaders)
+          ? respond(indexPage(parts, theme, page), "text/html", pageHeaders)
           : respond(indexXml(parts, self), "application/xml", xmlHeaders);
       }
       const chunk = chunks[part - 1];
       if (!chunk) return new Response("Not found", { status: 404, headers: VARY });
       return browser
-        ? respond(urlsetPage(chunk, theme, options), "text/html", pageHeaders)
+        ? respond(urlsetPage(chunk, theme, page), "text/html", pageHeaders)
         : respond(urlsetXml(chunk, self), "application/xml", xmlHeaders);
     }
 
     return browser
-      ? respond(urlsetPage(entries, theme, options), "text/html", pageHeaders)
+      ? respond(urlsetPage(entries, theme, page), "text/html", pageHeaders)
       : respond(urlsetXml(entries, self), "application/xml", xmlHeaders);
   };
 }
