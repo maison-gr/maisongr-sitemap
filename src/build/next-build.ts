@@ -24,7 +24,28 @@ function localesOf(root: string, routes: { pattern: string }[], files: string[])
   return found ? { ...found, ...(prefixed ? { prefix: true } : {}) } : undefined;
 }
 
-const NEXT_CONFIGS = ["next.config.ts", "next.config.mts", "next.config.mjs", "next.config.js", "next.config.cjs"];
+/**
+ * Paths the middleware keeps for signed-in visitors, from a list it names for
+ * that: const PROTECTED = ["/dashboard", "/session"]. Crawlers are never signed
+ * in, so for them every page under one of these is a redirect to the login.
+ */
+export function protectedPaths(root: string): string[] {
+  const file = MIDDLEWARE.map((f) => join(root, f)).find(existsSync);
+  if (!file) return [];
+  const paths: string[] = [];
+  for (const m of read(file).matchAll(/\b(?:const|let|var)\s+\w*(?:PROTECTED|PRIVATE|AUTH_REQUIRED|REQUIRES_AUTH|AUTHENTICATED|MEMBERS_ONLY)\w*\s*(?::[^=]+)?=\s*\[([^\]]*)\]/gi)) {
+    for (const p of m[1]!.matchAll(/["'](\/[^"']*)["']/g)) paths.push(p[1]!.replace(/\/+$/, "") || "/");
+  }
+  return [...new Set(paths)].filter((p) => p !== "/");
+}
+
+/** The protected path a route falls under, its language segment set aside. */
+function underProtected(pattern: string, paths: string[]): string | undefined {
+  const path = pattern.replace(/^\/\[(locale|lang)\]/, "") || "/";
+  return paths.find((p) => path === p || path.startsWith(`${p}/`));
+}
+
+const NEXT_CONFIGS =["next.config.ts", "next.config.mts", "next.config.mjs", "next.config.js", "next.config.cjs"];
 
 /**
  * basePath and trailingSlash as next.config writes them. Without them every
@@ -84,7 +105,14 @@ export async function buildNext(
   // Routes, from both routers when the project has both.
   const app = detected.appDir ? appRoutes(root, detected.appDir) : { routes: [], skipped: [] };
   const pages = detected.pagesDir ? pagesRoutes(root, detected.pagesDir) : { routes: [], skipped: [] };
-  const routes = [...app.routes, ...pages.routes.filter((p) => !app.routes.some((a) => a.pattern === p.pattern))];
+  const found = [...app.routes, ...pages.routes.filter((p) => !app.routes.some((a) => a.pattern === p.pattern))];
+  // Pages the middleware sends signed-out visitors (crawlers among them) away from.
+  const guarded = protectedPaths(root);
+  const signedIn = found.flatMap((r) => {
+    const path = underProtected(r.pattern, guarded);
+    return path ? [{ pattern: r.pattern, reason: `signed-in only (${path})` }] : [];
+  });
+  const routes = found.filter((r) => !signedIn.some((s) => s.pattern === r.pattern));
 
   const files = sourceFiles(root);
   const layout = layoutOf(root, detected.appDir);
@@ -97,7 +125,7 @@ export async function buildNext(
       framework: "next",
       manifestPath: manifestPathOf(root, appDir),
       routes,
-      skipped: [...app.skipped, ...pages.skipped],
+      skipped: [...app.skipped, ...pages.skipped, ...signedIn],
       stylesheets: cssFiles(root, layout),
       fonts: fontFiles.flatMap((f) => nextFonts(read(f), dirname(f))),
       publicDir: join(root, "public"),

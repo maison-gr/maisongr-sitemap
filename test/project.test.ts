@@ -235,6 +235,26 @@ describe("a site with no root layout, languages as a TypeScript type, and a not-
   });
 });
 
+describe("pages the middleware keeps for signed-in visitors", () => {
+  it("leaves them out, under any language, and keeps the pages around them", async () => {
+    const root = project({
+      "package.json": '{"dependencies":{"next":"16"}}',
+      "proxy.ts": "const PROTECTED   = ['/dashboard', '/session', '/history']\nconst AUTH_PAGES = ['/login']",
+      "app/[locale]/page.tsx": "",
+      "app/[locale]/sessions-guide/page.tsx": "",
+      "app/[locale]/session/custom/page.tsx": "'use client'",
+      "app/[locale]/history/page.tsx": "",
+      "i18n/routing.ts": 'export const routing = defineRouting({ locales: ["en", "fr"], defaultLocale: "en" });',
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.routes).toBe(2); // "/" and "/sessions-guide": a prefix only counts at a slash
+    expect(report.skipped).toEqual(expect.arrayContaining([
+      { pattern: "/[locale]/session/custom", reason: "signed-in only (/session)" },
+      { pattern: "/[locale]/history", reason: "signed-in only (/history)" },
+    ]));
+  });
+});
+
 describe("languages added by middleware", () => {
   it("prefixes every route when the middleware routes by locale and there is no [locale] folder", async () => {
     const root = project({
