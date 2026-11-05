@@ -82,9 +82,24 @@ Each one has been checked on a real production build: Next.js 15 and 16 (App Rou
 6. **Reads your config**: the site address, and the base path and trailing slash (Next.js `basePath` and `trailingSlash`, Astro `site`, `base` and `trailingSlash`, SvelteKit `paths.base`, Nuxt `app.baseURL` and `site.url`). No address in the sitemap redirects.
 7. **Writes** the route and its `manifest.json`, then puts `maisongr-sitemap build` at the start of your `build` script, so every build re-reads all of it. It goes in `build` itself, not `prebuild`, because pnpm and Yarn 2+ never run `prebuild`.
 
-If another file or package already serves `/sitemap.xml` (`next-sitemap`, `@astrojs/sitemap`, `@nuxtjs/sitemap`, a `public/sitemap.xml`), `init` stops and says so, before writing anything.
+If another file or package already serves `/sitemap.xml` (`next-sitemap`, `@astrojs/sitemap`, `@nuxtjs/sitemap`, a `public/sitemap.xml`), `init` stops and says so, before writing anything. `init --replace` takes over instead (see [Moving from another sitemap](#moving-from-another-sitemap)).
 
 Then install it: `npm install maisongr-sitemap`.
+
+## Moving from another sitemap
+
+```sh
+npx maisongr-sitemap init --replace
+```
+
+It takes over from next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or a sitemap in your public folder, including one styled with an `.xsl` file. Run `init` without the flag first: it stops and names the first clash, and nothing changes.
+
+- **Nothing is deleted.** The old route, the `sitemap*.xml`, `.xsl` and `next-sitemap.config.*` files move to `.sitemap-replaced/`, under their own paths. Delete that folder once you've checked the result.
+- **The old tool stops running.** Its step leaves your scripts (`postbuild`, usually), and its entry leaves `astro.config` or `nuxt.config`. If a config isn't written the usual way, `init` names the file for you to edit.
+- **Your address is kept.** next-sitemap's `siteUrl` becomes the route's `site`.
+- **The package stays until you remove it.** `init` prints the `npm uninstall` line, so `package.json` and your lockfile stay in step.
+
+Rules written in code (next-sitemap's `exclude` and `transform`, a hand-written route's database query) don't carry over. `init` says so when it moves such a file. Read it in `.sitemap-replaced/`, then give the same rules through `params`, `entries` or `exclude`.
 
 ## The route
 
@@ -384,6 +399,39 @@ Run it again whenever content changes, after a deploy or from a daily cron, so t
   - `--wait` waits up to 180 seconds (or the number you give) for a fresh deploy to serve the key.
 
   The key is yours to choose: 8 to 128 letters, digits or dashes. The site must serve it at `/<key>.txt`, and the command checks that before it sends anything.
+
+## For AI agents
+
+**Agent Skill.** Teaches Claude Code, Codex, Cursor and other coding agents the steps above:
+
+```sh
+npx skills add maison-gr/sitemap
+```
+
+**JSON.** `--json` on any command prints one report on stdout instead of the lines a person reads:
+
+```json
+{
+  "ok": true,
+  "command": "init",
+  "version": "1.5.1",
+  "subject": "Next.js 16 · App Router",
+  "sections": [{ "heading": "Wrote", "items": [{ "status": "ok", "text": "app/sitemap.xml/route.ts" }] }],
+  "warnings": 0
+}
+```
+
+A stop has `"ok": false` and the reason in `error`. Exit codes: `0` done, `1` stopped with a reason, `2` a bug in the tool. No command waits for input: `connect` writes `robots.txt` only with `--yes`.
+
+**MCP.** The commands as tools, over stdio, for any client that speaks the Model Context Protocol:
+
+```json
+{ "mcpServers": { "sitemap": { "command": "npx", "args": ["-y", "maisongr-sitemap", "mcp"] } } }
+```
+
+The tools are `sitemap_init`, `sitemap_build`, `sitemap_static`, `sitemap_crawl`, `sitemap_connect` and `sitemap_llms`. They work in the folder the server starts in. `indexnow` isn't one of them, because it sends to outside services.
+
+[`llms.txt`](llms.txt) sums all this up, and ships in the package.
 
 ## Limits
 

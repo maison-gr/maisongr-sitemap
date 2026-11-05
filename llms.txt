@@ -1,0 +1,34 @@
+# maisongr-sitemap
+
+> An open-source npm package (MIT, no runtime dependencies, Node 20.9+) that gives a website one sitemap with two readers. Search engines get standard XML at /sitemap.xml. A person opening the same address gets a page in the site's own colours, fonts and dark mode, without XSLT.
+
+It detects the framework, finds the pages, dates each one from Git, reads the theme and writes one route file. A browser opening a page sends `Sec-Fetch-Dest: document`, and crawlers never do: that header decides which answer is served. Both list the same addresses.
+
+## Set it up
+
+Run from the project's root, then do what the report's Next section says.
+
+- Next.js, Astro with an adapter, SvelteKit, Nuxt: `npx maisongr-sitemap init`, then `npm install maisongr-sitemap`
+- Astro without an adapter, adapter-static, nuxt generate, Vite and Create React App: `npx maisongr-sitemap init --site https://your.site`, then `npm install --save-dev maisongr-sitemap`
+- Express, Connect, Polka, node:http: `npx maisongr-sitemap init` in the server's folder, then list the addresses in `sitemap.js` and mount it
+- Hono, Cloudflare Workers, Bun, Deno, React Router: call `createSitemap` from `maisongr-sitemap` with a Request
+- A built static site: `npx maisongr-sitemap static dist --site https://your.site`
+- PHP, Python, Ruby, Go, Java, .NET, a CMS: `npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site`
+
+## Replace another sitemap
+
+`npx maisongr-sitemap init --replace` takes over from next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or an XSLT-styled sitemap in the public folder. It moves the old files to `.sitemap-replaced/`, deletes nothing, and prints the `npm uninstall` line to run.
+
+## For AI agents
+
+- `--json` on any command prints one report on stdout. Exit codes: 0 done, 1 stopped with a reason, 2 a bug in the tool.
+- No command waits for input. `connect` changes robots.txt only with `--yes`.
+- `npx skills add maison-gr/sitemap` installs the Agent Skill.
+- `npx maisongr-sitemap mcp` serves the commands as tools over MCP (stdio), in the folder it starts in.
+
+## Docs
+
+- [README](https://github.com/maison-gr/sitemap#readme): every option, framework and limit
+- [Agent Skill](https://github.com/maison-gr/sitemap/blob/main/skills/maisongr-sitemap/SKILL.md): the steps for a coding agent
+- [Changelog](https://github.com/maison-gr/sitemap/blob/main/CHANGELOG.md)
+- [npm](https://www.npmjs.com/package/maisongr-sitemap)
