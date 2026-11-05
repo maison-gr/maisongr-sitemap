@@ -2,9 +2,11 @@ name: Release
 
 # Publishes to npm when a GitHub release is published, never on a push.
 # Uses npm's trusted publishing: no npm token is stored; npm trusts this
-# workflow (set it up once under the package's settings on npmjs.com, as
-# "Trusted publisher": GitHub Actions, maison-gr/sitemap, release.yml).
-# Packages published this way carry a provenance statement.
+# workflow. Set it up once under the package's settings on npmjs.com:
+# Trusted publisher → GitHub Actions, organisation maison-gr, repository
+# sitemap, workflow release.yml, and allow `npm publish` (new publishers
+# allow only `npm stage publish` until told otherwise).
+# Provenance is attached automatically once the repository is public.
 
 on:
   release:
