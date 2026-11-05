@@ -73,6 +73,19 @@ describe("the Vite plugin", () => {
     expect((await fetch(`${base}/sitemap/page.js`)).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   });
 
+  it("answers one address two ways: a browser opening /sitemap.xml gets the page, a crawler the XML", async () => {
+    const base = await devServer(project(SPA), sitemap({ site: "https://aquadrill.example" }));
+    const person = await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document" } });
+    expect(person.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(person.headers.get("x-robots-tag")).toBe("noindex");
+    expect(person.headers.get("vary")).toBe("Sec-Fetch-Dest");
+    expect(await person.text()).toContain('href="/services"');
+    const crawler = await fetch(`${base}/sitemap.xml`);
+    expect(crawler.headers.get("content-type")).toBe("application/xml; charset=utf-8");
+    expect(crawler.headers.get("vary")).toBe("Sec-Fetch-Dest");
+    expect(crawler.headers.get("x-robots-tag")).toBeNull();
+  });
+
   it("takes the site's colours from its source stylesheets", async () => {
     const base = await devServer(project(SPA), sitemap({ site: "https://aquadrill.example" }));
     expect((await (await fetch(`${base}/sitemap/page.css`)).text()).toLowerCase()).toContain("#f4efe6");

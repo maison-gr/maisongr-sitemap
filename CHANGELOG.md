@@ -6,7 +6,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ### Added
 
-- `maisongr-sitemap/vite`: a Vite plugin that serves the sitemap during `vite dev`, where the build's static step never runs and the app's catch-all route answered `/sitemap.xml` with its 404. It answers `/sitemap.xml`, `/sitemap/` and their files from the router's routes and the source stylesheets, the same files the build writes, and reads the routes again on each request.
+- `maisongr-sitemap/vite`: a Vite plugin that serves the sitemap during `vite dev`, where the build's static step never runs and the app's catch-all route answered `/sitemap.xml` with its 404. A browser opening `/sitemap.xml` gets the page and a crawler the XML, as in production with the host rule now documented under "One address on a static host" (Cloudflare and Vercel). It answers `/sitemap.xml`, `/sitemap/` and their files from the router's routes and the source stylesheets, the same files the build writes, and reads the routes again on each request.
 
 ### Changed
 

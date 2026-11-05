@@ -82,7 +82,9 @@ export function sitemap(options: ViteSitemapOptions) {
     configureServer(server: DevServer) {
       server.middlewares.use((req, res, next) => {
         const path = (req.url ?? "/").split(/[?#]/)[0]!.replace(/^\//, "");
-        const file = path === "sitemap" || path === "sitemap/" ? "sitemap/index.html" : path;
+        // One address, two readers, as the host's rule does in production: a browser opening /sitemap.xml gets the page.
+        const browser = req.headers["sec-fetch-dest"] === "document";
+        const file = path === "sitemap" || path === "sitemap/" || (path === "sitemap.xml" && browser) ? "sitemap/index.html" : path;
         if (file !== "sitemap.xml" && file !== "sitemap.css" && !file.startsWith("sitemap/")) return next();
         let body: string | undefined;
         try {
@@ -97,6 +99,8 @@ export function sitemap(options: ViteSitemapOptions) {
         res.statusCode = 200;
         res.setHeader("Content-Type", TYPES[file.split(".").pop()!]!);
         res.setHeader("Cache-Control", "no-store");
+        if (path === "sitemap.xml") res.setHeader("Vary", "Sec-Fetch-Dest");
+        if (file === "sitemap/index.html") res.setHeader("X-Robots-Tag", "noindex");
         res.end(req.method === "HEAD" ? undefined : body);
       });
     },

@@ -274,7 +274,38 @@ It reads the built HTML, so each page's language and `hreflang` links come from 
 - **Addresses** follow your links. A site that links to `/about.html` gets `/about.html` (plain Apache and nginx serve nothing at `/about`); one that links to `/about` gets `/about`. `--clean-urls` forces the second.
 - **Dates.** Hand-written HTML that Git tracks is dated from Git, file by file. A build output Git ignores gets no `lastmod`: built files don't say when their content changed, and a build date would be false.
 - `--add /press,/jobs` lists addresses no HTML file holds.
-- With `--images`, each page's `og:image` and `<img>` sources go into an image sitemap. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
+- With `--images`, each page's `og:image` and `<img>` sources go into an image sitemap.
+
+### One address on a static host
+
+A file can't answer two readers by itself, so one rule at your host does it: when a browser opens `/sitemap.xml` (it sends `Sec-Fetch-Dest: document`; crawlers never do), serve `/sitemap/index.html` at that same address. Crawlers keep getting the XML. Without the rule, people opening `/sitemap.xml` get the XML set in your site's design, with a pointer to `/sitemap/`.
+
+**Cloudflare** (any host behind a proxied Cloudflare DNS record, on every plan):
+
+1. *Rules → Transform Rules → URL Rewrite*, custom filter expression:
+   `(http.request.uri.path eq "/sitemap.xml" and any(http.request.headers["sec-fetch-dest"][*] eq "document"))`
+   Path: *Rewrite to* → *Static* → `/sitemap/index.html`. Query: preserve.
+2. *Rules → Transform Rules → Modify Response Header*, expression `(raw.http.request.uri.path eq "/sitemap.xml")`: *Set static* `Vary` to `Sec-Fetch-Dest`.
+
+**Vercel**, in `vercel.json`:
+
+```json
+{
+  "rewrites": [
+    { "source": "/sitemap.xml", "has": [{ "type": "header", "key": "sec-fetch-dest", "value": "document" }], "destination": "/sitemap/index.html" }
+  ],
+  "headers": [{ "source": "/sitemap.xml", "headers": [{ "key": "Vary", "value": "Sec-Fetch-Dest" }] }]
+}
+```
+
+The page carries `<meta name="robots" content="noindex">`, so `/sitemap/` is never indexed. Check both readers after a deploy:
+
+```sh
+curl -sI https://www.example.com/sitemap.xml                              # application/xml
+curl -sI -H "Sec-Fetch-Dest: document" https://www.example.com/sitemap.xml # text/html
+```
+
+`vite dev` with the plugin below answers the same way, so what you test locally is what the rule serves. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
 
 ## Single-page apps
 

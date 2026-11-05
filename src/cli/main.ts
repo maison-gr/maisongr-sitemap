@@ -422,7 +422,7 @@ function runStatic() {
   }
   u.heading("Wrote");
   for (const f of report.written) u.ok(`${dir}/${f}`);
-  u.text(u.paint("A static host can't tell browsers from crawlers: people get the page at /sitemap/, and /sitemap.xml is styled with CSS.", "dim"));
+  u.text(u.paint("One address for both: add your host's rule so a browser opening /sitemap.xml gets the page (sitemap/index.html). Cloudflare, Vercel: https://github.com/maison-gr/sitemap#one-address-on-a-static-host", "dim"));
 }
 
 /** Any site at all (PHP, Python, Ruby, a CMS): read it as a search engine would, and write the sitemap files where its server serves files. */
