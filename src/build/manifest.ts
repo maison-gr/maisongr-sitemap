@@ -15,6 +15,8 @@ export type BuildReport = {
   skipped: Skipped[];
   /** Dynamic routes that need `params` in the route file to be listed. */
   needParams: string[];
+  /** Dynamic routes listed from their page's own generateStaticParams (Next.js). */
+  fromPages?: string[];
   missedFonts: string[];
   /** The manifest already there could not be read (a merge conflict, say), so it was rebuilt from the project. */
   rebuilt: boolean;

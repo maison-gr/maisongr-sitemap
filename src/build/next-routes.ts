@@ -38,7 +38,7 @@ export function appRoutes(root: string, appDir: string): { routes: FoundRoute[];
       if (privateSegment) skipped.push({ pattern, reason: `private page (${privateSegment})` });
       else if (emptyPageReason(join(dir, page))) skipped.push({ pattern, reason: emptyPageReason(join(dir, page))! });
       else if (noindex || isNoindex(root, join(dir, page))) skipped.push({ pattern, reason: "noindex" });
-      else routes.push({ pattern, files: here.filter((n) => SOURCE.test(n)).map((n) => toPosix(relative(root, join(dir, n)))) });
+      else routes.push({ pattern, files: here.filter((n) => SOURCE.test(n)).map((n) => toPosix(relative(root, join(dir, n)))), page: toPosix(relative(root, join(dir, page))) });
     }
 
     for (const n of names) {

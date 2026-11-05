@@ -68,6 +68,10 @@ function printReport(r: BuildReport) {
     say(`  Left out:`);
     for (const s of r.skipped) say(`    ${s.pattern}  ${s.reason}`);
   }
+  if (r.fromPages?.length) {
+    say(`  Dynamic routes listed from their own generateStaticParams:`);
+    for (const p of r.fromPages) say(`    ${p}`);
+  }
   if (r.needParams.length) {
     say(`  Dynamic routes, listed only once the route file gives their values (params):`);
     for (const p of r.needParams) say(`    ${p}`);

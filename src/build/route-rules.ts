@@ -6,6 +6,8 @@ export type FoundRoute = {
   pattern: string;
   /** Files whose last commit dates the route: the page and what sits beside it. */
   files: string[];
+  /** The page file itself, relative to the project (Next.js App Router). */
+  page?: string;
 };
 
 export type Skipped = { pattern: string; reason: string };

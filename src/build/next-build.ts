@@ -1,5 +1,6 @@
-import { existsSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { toPosix, type FoundRoute } from "./route-rules.js";
 import type { Manifest } from "../types.js";
 import type { Detected } from "./detect.js";
 import { nextFonts } from "./fonts.js";
@@ -119,7 +120,7 @@ export async function buildNext(
   // Fonts from wherever next/font is called, the root layout first.
   const fontFiles = [...(layout ? [layout] : []), ...files.filter((f) => f !== layout && read(f).includes("next/font/"))];
 
-  return writeManifest(
+  const report = await writeManifest(
     root,
     {
       framework: "next",
@@ -136,5 +137,40 @@ export async function buildNext(
       ...nextConfigOf(root),
     },
     options,
+  );
+
+  // Dynamic pages that already list their values, through generateStaticParams, need nothing from the route file.
+  const fromPages = routes.filter((r) => report.needParams.includes(r.pattern) && r.page && STATIC_PARAMS.test(read(join(root, r.page))));
+  writeParamsFile(root, appDir, fromPages);
+  return { ...report, needParams: report.needParams.filter((p) => !fromPages.some((r) => r.pattern === p)), fromPages: fromPages.map((r) => r.pattern) };
+}
+
+/** export function generateStaticParams, export async function…, or export const generateStaticParams = … */
+const STATIC_PARAMS = /\bexport\s+(?:async\s+)?(?:function\s+generateStaticParams\b|const\s+generateStaticParams\s*=)/;
+
+/** The file beside the route that hands each dynamic page's generateStaticParams to the sitemap, rewritten on every build. */
+export function paramsPathOf(root: string, appDir: string) {
+  const ts = existsSync(join(root, "tsconfig.json"));
+  return join(root, appDir, "sitemap.xml", ts ? "params.ts" : "params.js");
+}
+
+function writeParamsFile(root: string, appDir: string, routes: FoundRoute[]) {
+  const file = paramsPathOf(root, appDir);
+  const ts = file.endsWith(".ts");
+  const lines = routes.map((r) => {
+    const spec = toPosix(relative(dirname(file), join(root, r.page!))).replace(/\.(tsx|ts|jsx|js)$/, "");
+    return `  ${JSON.stringify(r.pattern)}: staticParams(() => import(${JSON.stringify(spec.startsWith(".") ? spec : `./${spec}`)})),`;
+  });
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(
+    file,
+    `// Written by \`maisongr-sitemap build\` before each build: each dynamic page's own generateStaticParams,
+// so its addresses are listed with nothing to keep in sync. Don't edit it; give other values in route${ts ? ".ts" : ".js"} with \`params\`.
+import { staticParams } from "maisongr-sitemap/next";
+
+export const pageParams = {
+${lines.join("\n")}
+};
+`,
   );
 }

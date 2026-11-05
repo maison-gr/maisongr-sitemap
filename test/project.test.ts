@@ -235,6 +235,36 @@ describe("a site with no root layout, languages as a TypeScript type, and a not-
   });
 });
 
+describe("dynamic pages that list their own values", () => {
+  it("hands each page's generateStaticParams to the sitemap, and asks only for the rest", async () => {
+    const root = project({
+      "package.json": '{"dependencies":{"next":"16"}}',
+      "tsconfig.json": "{}",
+      "app/[locale]/page.tsx": "",
+      "app/[locale]/blog/[slug]/page.tsx": "export function generateStaticParams() { return [{ slug: 'a' }]; }",
+      "app/[locale]/practice/[scenarioSlug]/page.tsx": "export async function generateStaticParams() { return []; }",
+      "app/[locale]/notes/[id]/page.tsx": "export default function Note() { return null; }",
+      "i18n/routing.ts": 'export const routing = defineRouting({ locales: ["en", "fr"], defaultLocale: "en" });',
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.fromPages).toEqual(["/[locale]/blog/[slug]", "/[locale]/practice/[scenarioSlug]"]);
+    expect(report.needParams).toEqual(["/[locale]/notes/[id]"]);
+    const params = readFileSync(join(root, "app/sitemap.xml/params.ts"), "utf8");
+    expect(params).toContain('"/[locale]/blog/[slug]": staticParams(() => import("../[locale]/blog/[slug]/page")),');
+    expect(params).not.toContain("notes");
+  });
+
+  it("takes rows from generateStaticParams, and leaves out a page whose generateStaticParams fails", async () => {
+    const { staticParams } = await import("../src/next.js");
+    expect(await staticParams(async () => ({ generateStaticParams: () => [{ locale: "en", slug: "a" }] }))()).toEqual([{ locale: "en", slug: "a" }]);
+    const warn = console.warn;
+    console.warn = () => {};
+    expect(await staticParams(async () => ({ generateStaticParams: () => Promise.reject(new Error("db down")) }))()).toEqual([]);
+    expect(await staticParams(() => Promise.reject(new Error("no module")))()).toEqual([]);
+    console.warn = warn;
+  });
+});
+
 describe("pages the middleware keeps for signed-in visitors", () => {
   it("leaves them out, under any language, and keeps the pages around them", async () => {
     const root = project({

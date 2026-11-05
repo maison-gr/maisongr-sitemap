@@ -55,11 +55,17 @@ export function routeSource(detected: ServerKind, ts: boolean, options: { cacheC
     return `${HEADER("./manifest.json")}
 import { sitemap } from "maisongr-sitemap/next";
 import manifest from "./manifest.json";
+// Every dynamic page that has a generateStaticParams, rewritten before each build.
+import { pageParams } from "./params";
 
 ${dynamic}
 export const GET = sitemap({
   manifest,
-${PARAMS_HINT(`{ "/blog/[slug]": async () => (await getPosts()).map((p) => ({ slug: p.slug, lastmod: p.updatedAt })) }`)}
+  params: {
+    ...pageParams,
+    // A dynamic page without generateStaticParams is listed once you give its values, for example:
+    // "/blog/[slug]": async () => (await getPosts()).map((p) => ({ slug: p.slug, lastmod: p.updatedAt })),
+  },
 });
 `;
   }
