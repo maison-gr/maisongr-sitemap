@@ -2,7 +2,7 @@
 
 All notable changes to `@maison-gr/sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-04
 
 The first release.
 
@@ -30,3 +30,5 @@ The first release.
 - `indexnow`: sends changed addresses to Bing and the other IndexNow engines, after checking the site serves its key.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
+
+[1.0.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.0.0
