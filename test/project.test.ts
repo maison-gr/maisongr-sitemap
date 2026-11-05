@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -128,6 +128,18 @@ describe("dates from Git", () => {
     writeFileSync(join(root, "b.tsx"), "2");
     git(root, ["commit", "-qam", "two"], "2026-03-04T10:00:00Z");
     expect(Object.fromEntries(gitDates(root, ["a.tsx", "b.tsx", "c.tsx"]))).toEqual({ "a.tsx": "2026-01-02", "b.tsx": "2026-03-04" });
+  });
+
+  it("dates files when the project is reached through a path Git spells differently", () => {
+    const real = project({ "site/a.tsx": "1" });
+    git(real, ["init", "-q"]);
+    git(real, ["add", "."]);
+    git(real, ["commit", "-qm", "one"], "2026-02-03T10:00:00Z");
+    // A junction (Windows) or symlink (elsewhere): like C:\Users\RUNNER~1 or macOS's /var → /private/var.
+    const link = join(mkdtempSync(join(tmpdir(), "mgr-link-")), "here");
+    dirs.push(dirname(link));
+    symlinkSync(real, link, "junction");
+    expect(Object.fromEntries(gitDates(join(link, "site"), ["a.tsx"]))).toEqual({ "a.tsx": "2026-02-03" });
   });
 
   it("does not trust the boundary date of a shallow clone", () => {

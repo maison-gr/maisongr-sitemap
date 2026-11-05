@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { resolve } from "node:path";
 
 const git = (root: string, args: string[]) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
@@ -17,21 +17,24 @@ const git = (root: string, args: string[]) =>
 export function gitDates(root: string, paths: string[]): Map<string, string> {
   const dates = new Map<string, string>();
   if (!paths.length) return dates;
-  let top: string;
+  // Git says where the project sits in the repository, so a path Git spells
+  // differently (C:\Users\RUNNER~1, /var → /private/var, a symlink) still matches.
+  let prefix: string;
+  let shallowFile: string;
   try {
-    top = git(root, ["rev-parse", "--show-toplevel"]).trim();
+    [prefix = "", shallowFile = ""] = git(root, ["rev-parse", "--show-prefix", "--git-path", "shallow"]).split("\n").map((l) => l.trim());
   } catch {
     return dates; // not a Git repository
   }
-
-  const shallowFile = join(top, ".git", "shallow");
+  prefix = prefix.replace(/\/$/, "");
+  shallowFile = resolve(root, shallowFile);
   const boundary = new Set(existsSync(shallowFile) ? readFileSync(shallowFile, "utf8").split(/\s+/).filter(Boolean) : []);
-  const prefix = relative(top, root).split(sep).join("/");
   const wanted = new Set(paths.map((p) => (prefix ? `${prefix}/${p}` : p)));
 
   let log = "";
   try {
-    log = git(top, ["log", "--format=@%H %cs", "--name-only", "--no-renames", "--", ...[...wanted]]);
+    // Paths in the log are from the repository's top; ":/" pathspecs name them that way from any folder.
+    log = git(root, ["log", "--format=@%H %cs", "--name-only", "--no-renames", "--", ...[...wanted].map((p) => `:/${p}`)]);
   } catch {
     return dates;
   }
