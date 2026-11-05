@@ -4,6 +4,19 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-05
+
+Found by moving AquaDrill, a prerendered Vite app, onto the package.
+
+### Added
+
+- A single-page app's pages are dated from Git by the file of the component each route renders (`element={<Services />}`, `lazy(() => import("./pages/Services"))`), so each `lastmod` is true. A page the build prerendered takes its route's date.
+
+### Fixed
+
+- Routes that only redirect (`<Navigate>`, `redirect:`) and the not-found catch-all (`*`, `/:pathMatch(.*)*`) are left out, and named as such, instead of being listed or asked for values.
+- The CLI says "its" for one dynamic route, "their" for several.
+
 ## [1.3.0] - 2026-11-05
 
 ### Added
@@ -100,6 +113,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.4.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.0
 [1.3.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.1.0
