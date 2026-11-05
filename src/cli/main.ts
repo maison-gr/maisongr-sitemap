@@ -5,6 +5,7 @@ import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
+import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
 const HELP = `@maison-gr/sitemap
 
@@ -12,6 +13,9 @@ const HELP = `@maison-gr/sitemap
   maisongr-sitemap build             Re-read routes, dates and theme (run before each build)
   maisongr-sitemap static <dir> --site <url>
                                      For sites with no server: write sitemap.xml and /sitemap/ into <dir>
+  maisongr-sitemap indexnow --site <url> --key <key>
+                                     Tell Bing and the other IndexNow engines which pages changed (after a deploy)
+                                     --since <YYYY-MM-DD> (default: yesterday)  --all  --dry-run  --sitemap <file or url>
 
   Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
             --site      the address the site is served at (init, for a static build)
@@ -214,6 +218,49 @@ function runStatic() {
   say(`\n  A static host cannot tell browsers from crawlers, so the designed page lives at /sitemap/ and /sitemap.xml is styled with CSS.\n`);
 }
 
+/** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
+async function sitemapUrls(source: string): Promise<Sitemap["urls"]> {
+  const read = async (where: string) => {
+    if (!/^https?:\/\//.test(where)) return readSitemap(readFileSync(join(root, where), "utf8"));
+    const res = await fetch(where);
+    if (!res.ok) fail(`${where} answered ${res.status}. Deploy first, or pass --sitemap <file>.`);
+    return readSitemap(await res.text());
+  };
+  const first = await read(source);
+  const parts = await Promise.all(first.parts.map(read));
+  return [...first.urls, ...parts.flatMap((p) => p.urls)];
+}
+
+async function runIndexNow() {
+  const site = (value("site") ?? process.env.SITEMAP_SITE_URL)?.replace(/\/+$/, "");
+  const key = value("key") ?? process.env.INDEXNOW_KEY;
+  if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at: --site https://your.site");
+  if (!key || !validKey(key)) fail("Give your IndexNow key: --key <8 to 128 letters, digits or dashes> (or set INDEXNOW_KEY).");
+
+  // The engines fetch the key from the site to prove the submission is the owner's.
+  const keyFile = `${site}/${key}.txt`;
+  const served = await fetch(keyFile).then((r) => (r.ok ? r.text() : ""), () => "");
+  if (served.trim() !== key) {
+    fail(`${keyFile} does not serve the key. Put a file named ${key}.txt, containing only the key, in your public directory, deploy, and run this again.`);
+  }
+
+  const since = flag("all") ? undefined : value("since") ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date: --since 2026-11-01");
+  const urls = changedSince(await sitemapUrls(value("sitemap") ?? `${site}/sitemap.xml`), since);
+  say(`\n  ${plural(urls.length, "page")} ${since ? `changed since ${since}` : "in the sitemap"}`);
+  if (!urls.length) return say(`  Nothing to send.${since ? " Pages without a lastmod are sent only with --all." : ""}\n`);
+
+  if (flag("dry-run")) {
+    for (const u of urls.slice(0, 20)) say(`    ${u}`);
+    if (urls.length > 20) say(`    … and ${urls.length - 20} more`);
+    return say(`  Dry run: nothing was sent.\n`);
+  }
+  const results = await submit({ site: site!, key: key!, urls });
+  for (const r of results) say(`  Batch ${r.batch}: ${plural(r.urls, "page")} → ${r.status} ${r.meaning}`);
+  if (results.some((r) => r.status >= 300)) fail("IndexNow did not accept every batch.");
+  say();
+}
+
 /** Runs one command in `cwd` and returns the exit code. */
 export async function main(
   argv: string[],
@@ -230,6 +277,7 @@ export async function main(
     else if (command === "init") await init();
     else if (command === "build") await build();
     else if (command === "static") runStatic();
+    else if (command === "indexnow") await runIndexNow();
     else fail(`Unknown command "${command}".\n\n${HELP}`);
     return 0;
   } catch (error) {
