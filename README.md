@@ -37,7 +37,13 @@ Each one has been checked on a real production build: Next.js 15, Astro 7, Svelt
    - sign-in, account, admin, checkout and developer pages.
 
    Every page it leaves out is listed, with the reason.
-3. **Finds your languages**, from `[locale]` or `[lang]` folders, or from Next.js middleware that puts every page under `/{language}/`. Each language version is its own entry, with `hreflang` alternates and `x-default`.
+3. **Finds your languages**. Each language version is its own entry, with `hreflang` alternates and `x-default`. It reads:
+   - `[locale]` or `[lang]` route folders;
+   - Next.js middleware that puts every page under `/{language}/`;
+   - Astro's `i18n`, with one folder per language (`src/pages/fr/about.astro`);
+   - `@nuxtjs/i18n` and its `strategy`.
+
+   A default language served without a prefix (`/about` beside `/fr/about`) is followed too.
 4. **Dates every page** from Git (see [Dates](#dates)).
 5. **Reads your theme**:
    - colour tokens, light and dark: shadcn, Tailwind v4 `@theme`, or plain CSS variables, in stylesheets or in a layout's `<style>`;
@@ -79,7 +85,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `@maison-gr/sitemap` 
 | `exclude` | Paths to leave out, from routes and `entries` alike: exact (`"/thanks"`), prefix (`"/drafts/"`) or `RegExp`. |
 | `site` | The address the site is served at. Defaults to the manifest's, then the request's. |
 | `basePath`, `trailingSlash` | Override what was read from your config. |
-| `locales` | Override the detected languages: `{ list, default, prefix? }`. |
+| `locales` | Override the detected languages: `{ list, default, prefix?, prefixDefault?, folders? }`. |
 | `revalidate` | Seconds the list is kept before `params` and `entries` run again. Default 3600. A failed load is not kept. |
 | `theme` | Override any detected colour, font, name or icon. |
 | `credit` | The "Sitemap by Maison GR" footer line. Default `true`. |
@@ -167,10 +173,8 @@ Static mode writes no `lastmod`: built files don't say when their content change
 
 ## Limits
 
-These aren't handled yet. Each needs `entries`, `locales` or `exclude` for now:
-
-- **Languages in plain folders** (Astro's `src/pages/fr/…`, or `@nuxtjs/i18n` with the default locale unprefixed) are listed as separate pages, without `hreflang` between them.
 - **Dynamic routes** are listed only when the route is given their values through `params`. The build report names every route that needs them.
+- **The URL is the language code.** An Astro locale written as `{ path: "spanish", codes: ["es"] }` is listed with `hreflang="spanish"`. Pass `locales` to the route to correct it.
 
 ## Requirements
 

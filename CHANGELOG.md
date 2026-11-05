@@ -13,7 +13,13 @@ The first release.
 - `init` for Next.js (App and Pages Router), Astro, SvelteKit and Nuxt, served or static. It refuses to overwrite another sitemap.
 - Pages found from each framework's route files. It leaves out `noindex`, private and developer pages, and lists each one it leaves out, with the reason.
 - `lastmod` from Git, kept true in shallow CI clones through the committed manifest.
-- `hreflang` alternates and `x-default` for `[locale]` and `[lang]` routes, and for Next.js middleware that prefixes every page.
+- `hreflang` alternates and `x-default` for:
+  - `[locale]` and `[lang]` routes;
+  - Next.js middleware that prefixes every page;
+  - Astro's `i18n` folders;
+  - `@nuxtjs/i18n`.
+
+  A default language served without a prefix is followed too.
 - The theme read from the site: colour tokens light and dark, with an AA contrast check on secondary text. Fonts from `next/font`, `@font-face`, Fontsource, Astro's Fonts API or Google Fonts, all served from the site's own domain.
 - `basePath`, `trailingSlash` and the site address read from each framework's config.
 - `@maison-gr/sitemap/node` for Express, Connect, Polka and `node:http`, and `createSitemap` for any server that speaks `Request` and `Response`.
