@@ -1,12 +1,12 @@
 name: Release
 
-# Publishes to npm when a GitHub release is published, never on a push.
-# Uses npm's trusted publishing: no npm token is stored; npm trusts this
-# workflow. Set it up once under the package's settings on npmjs.com:
-# Trusted publisher → GitHub Actions, organisation maison-gr, repository
-# sitemap, workflow release.yml, and allow `npm publish` (new publishers
-# allow only `npm stage publish` until told otherwise).
-# Provenance is attached automatically once the repository is public.
+# Publishes to npm when a GitHub release is published, through npm trusted publishing:
+# no token is stored, and npm records a provenance attestation linking the package to
+# this workflow run and commit.
+#
+# Set up once on npmjs.com, in the package's settings → Trusted publisher:
+# GitHub Actions, organisation maison-gr, repository sitemap, workflow release.yml,
+# environment npm, and allow `npm publish`.
 
 on:
   release:
@@ -14,26 +14,28 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # required for trusted publishing and provenance
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
+          # Trusted publishing needs npm 11.5.1 or later, which ships with Node.js 24.
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
-      # Trusted publishing needs npm 11.5.1 or later.
-      - run: npm install --global npm@11
+      - name: Check that the tag matches the package version
+        run: test "v$(node -p 'require("./package.json").version')" = "${{ github.event.release.tag_name }}"
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build && node test/smoke.mjs
-      # The release's tag must match package.json, so what is published is what was released.
-      - run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
-      - run: npm publish --access public
+      - run: npm publish --provenance --access public
