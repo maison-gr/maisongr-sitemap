@@ -15,6 +15,18 @@
   "engines": {
     "node": ">=20.9"
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "next": [
+        "./dist/next.d.ts"
+      ],
+      "node": [
+        "./dist/node.d.ts"
+      ]
+    }
+  },
   "bin": {
     "maisongr-sitemap": "./dist/cli/index.js"
   },
