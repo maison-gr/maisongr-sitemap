@@ -1,7 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { blocks, scopes } from "../src/build/css.js";
-import { contrast, palette } from "../src/build/palette.js";
+import { cssFonts } from "../src/build/css-fonts.js";
 import { nextFonts } from "../src/build/fonts.js";
+import { contrast, palette } from "../src/build/palette.js";
+
+const dirs: string[] = [];
+function project(files: Record<string, string>): string {
+  const root = mkdtempSync(join(tmpdir(), "mgr-fonts-"));
+  dirs.push(root);
+  for (const [path, body] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), body);
+  }
+  return root;
+}
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
 
 const read = (css: string) => scopes(blocks(css));
 
@@ -70,10 +88,61 @@ describe("fonts from next/font", () => {
     ]);
   });
 
-  it("finds local fonts", () => {
+  it("finds local next/font fonts", () => {
     const layout = `import localFont from "next/font/local";
       const brand = localFont({ src: "./fonts/Brand.woff2", variable: "--font-brand" });`;
     const [font] = nextFonts(layout, "/proj/app");
     expect(font).toMatchObject({ kind: "local", family: "brand", role: "body" });
+  });
+});
+
+describe("fonts from CSS, Fontsource and Astro's Fonts API", () => {
+  it("takes the site's own @font-face files first, with the role its tokens give them", () => {
+    const root = project({
+      "src/styles/fonts/Satoshi.woff2": "x",
+      "public/fonts/plex-mono.woff2": "x",
+      "src/styles/global.css": "",
+    });
+    const css = `@font-face { font-family: "Satoshi"; src: url("./fonts/Satoshi.woff2") format("woff2"); font-weight: 300 900; }
+      @font-face { font-family: "Satoshi"; src: url("./fonts/Satoshi-Italic.woff2"); font-style: italic; }
+      @font-face { font-family: Plex Mono; src: url(/fonts/plex-mono.woff2); }
+      @font-face { font-family: "Remote"; src: url(https://cdn.example.com/r.woff2); }
+      @theme { --font-display: "Satoshi", sans-serif; --font-mono: "Plex Mono", monospace; --font-weight-bold: 700; }`;
+    const fonts = cssFonts({ root, stylesheets: [{ file: join(root, "src/styles/global.css"), css }], sources: [], publicDir: join(root, "public") });
+    expect(fonts.map((f) => [f.kind, f.family, f.role])).toEqual([
+      ["local", "Satoshi", "display"],
+      ["local", "Plex Mono", "mono"],
+    ]);
+    expect(fonts[0]).toMatchObject({ files: [{ path: join(root, "src/styles/fonts/Satoshi.woff2"), weight: "300 900" }] });
+  });
+
+  it("takes the Latin files of an imported Fontsource package from node_modules", () => {
+    const pkg = "node_modules/@fontsource-variable/inter";
+    const root = project({
+      [`${pkg}/index.css`]: `/* inter-latin-ext-wght-normal */ @font-face { font-family: 'Inter Variable'; src: url(./files/inter-latin-ext-wght-normal.woff2) format('woff2-variations'); font-weight: 100 900; }
+        /* inter-latin-wght-normal */ @font-face { font-family: 'Inter Variable'; src: url(./files/inter-latin-wght-normal.woff2) format('woff2-variations'); font-weight: 100 900; }`,
+      [`${pkg}/files/inter-latin-wght-normal.woff2`]: "x",
+      [`${pkg}/files/inter-latin-ext-wght-normal.woff2`]: "x",
+    });
+    const fonts = cssFonts({ root, stylesheets: [], sources: ['import "@fontsource-variable/inter";'], publicDir: join(root, "public") });
+    expect(fonts).toEqual([
+      { kind: "local", family: "Inter Variable", role: "body", files: [{ path: join(root, pkg, "files/inter-latin-wght-normal.woff2"), weight: "100 900", style: undefined }] },
+    ]);
+  });
+
+  it("reads Astro's Fonts API, then falls back to the families the CSS asks for", () => {
+    const astroConfig = `export default defineConfig({ fonts: [{ provider: fontProviders.google(), name: "Fraunces", cssVariable: "--font-heading" }] });`;
+    const css = `body { font-family: "Atkinson Hyperlegible", system-ui, sans-serif } code, pre { font-family: ui-monospace, "JetBrains Mono", monospace } h1 { font-family: var(--font-heading) }`;
+    const fonts = cssFonts({ root: project({}), stylesheets: [{ file: "/x.css", css }], sources: [], publicDir: "/public", astroConfig });
+    expect(fonts.map((f) => [f.kind, f.family, f.role])).toEqual([
+      ["google", "Fraunces", "display"],
+      ["google", "Atkinson Hyperlegible", "body"],
+      ["google", "JetBrains Mono", "mono"],
+    ]);
+  });
+
+  it("does not mistake a system font stack for a font to download", () => {
+    const css = `body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif }`;
+    expect(cssFonts({ root: project({}), stylesheets: [{ file: "/x.css", css }], sources: [], publicDir: "/p" })).toEqual([]);
   });
 });

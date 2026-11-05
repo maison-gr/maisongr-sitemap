@@ -10,7 +10,7 @@ export type FontSource =
   | { kind: "local"; family: string; role: FontRole; files: { path: string; weight?: string; style?: string }[] };
 
 /** The role a font's variable or name says it plays, if either says. */
-function hintOf(variable: string | undefined, family: string): FontRole | null {
+export function hintOf(variable: string | undefined, family: string): FontRole | null {
   const v = variable?.toLowerCase() ?? "";
   if (/mono|code/.test(`${v} ${family.toLowerCase()}`)) return "mono";
   if (/display|heading|head|title|serif/.test(v)) return "display";
@@ -19,7 +19,7 @@ function hintOf(variable: string | undefined, family: string): FontRole | null {
 }
 
 /** Fonts with no hint take the body role first, then display. */
-function assignRoles<T extends { role: FontRole | null }>(fonts: T[]): (T & { role: FontRole })[] {
+export function assignRoles<T extends { role: FontRole | null }>(fonts: T[]): (T & { role: FontRole })[] {
   const taken = new Set(fonts.map((f) => f.role).filter(Boolean));
   return fonts.map((f) => {
     if (f.role) return f as T & { role: FontRole };
