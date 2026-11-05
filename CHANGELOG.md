@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-05
+
 ### Added
 
 - The page people see speaks French for a French site: « Plan du site », « Toutes les pages de… », the filter and its live count, the footer, and `<html lang>`. It follows the site's default language; `lang` sets it, and `--lang` in static mode and `crawl`, which otherwise take the home page's `<html lang>`.
@@ -98,6 +100,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.3.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.0.0
