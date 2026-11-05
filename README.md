@@ -10,6 +10,8 @@
 
 ![The same /sitemap.xml: the XML a crawler gets, and the page people get on three different sites, each in its own design.](.github/assets/hero.png)
 
+<sub>**One address, two answers.** Left: the XML that Google and Bing receive. Right: what a person sees opening the same `/sitemap.xml` in a browser, on three example sites. Each page takes its site's own colours and fonts, with nothing to design.</sub>
+
 ```sh
 npx maisongr-sitemap init
 ```
