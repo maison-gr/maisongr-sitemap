@@ -130,10 +130,10 @@ ${groups.join("\n")}
   return shell(theme, "Sitemap", body, options);
 }
 
-export function indexPage(parts: { loc: string; lastmod?: string; count: number }[], theme: Theme, options: PageOptions = {}): string {
+export function indexPage(parts: { loc: string; lastmod?: string; count: number; label?: string }[], theme: Theme, options: PageOptions = {}): string {
   const total = parts.reduce((s, p) => s + p.count, 0);
   const rows = parts
-    .map((p, i) => `<li class="row"><span class="num">${pad(i + 1, 2)}</span><a class="url" href="${esc(pathOf(p.loc))}">${esc(pathOf(p.loc))}</a><span class="lang">${p.count}</span><span class="date">${p.lastmod ? esc(p.lastmod) : ""}</span></li>`)
+    .map((p, i) => `<li class="row"><span class="num">${pad(i + 1, 2)}</span><a class="url" href="${esc(pathOf(p.loc))}">${esc(p.label ?? pathOf(p.loc))}</a><span class="lang">${p.count}</span><span class="date">${p.lastmod ? esc(p.lastmod) : ""}</span></li>`)
     .join("\n");
   const body = `<p class="eyebrow">Sitemap index</p>
 <h1>Every page on ${esc(theme.name)}<span class="mark">.</span></h1>

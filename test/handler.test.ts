@@ -188,6 +188,47 @@ describe("createSitemap", () => {
     expect(css).toContain("--bg:#fbfaf7");
   });
 
+  it("serves named sitemaps from one route, with /sitemap.xml as their index", async () => {
+    const several = createSitemap({
+      manifest: { ...manifest, routes: [{ pattern: "/", lastmod: "2026-10-01" }], locales: undefined },
+      sitemaps: {
+        companies: () => [{ loc: "/c/acme", lastmod: "2026-11-02" }, { loc: "/" }],
+        jobs: () => [],
+      },
+    });
+    const index = await (await get(several)).text();
+    expect(index).toContain("<sitemapindex");
+    expect(locs(index)).toEqual([
+      "https://www.example.com/sitemap.xml?sitemap=pages",
+      "https://www.example.com/sitemap.xml?sitemap=companies",
+      "https://www.example.com/sitemap.xml?sitemap=jobs",
+    ]);
+    expect(index).toContain("<lastmod>2026-11-02</lastmod>");
+    // "/" is listed once, in the first sitemap that has it.
+    expect(locs(await (await get(several, "/sitemap.xml?sitemap=companies")).text())).toEqual(["https://www.example.com/c/acme"]);
+    expect(locs(await (await get(several, "/sitemap.xml?sitemap=pages")).text())).toEqual(["https://www.example.com/"]);
+    expect((await get(several, "/sitemap.xml?sitemap=nope")).status).toBe(404);
+    const html = await (await get(several, "/sitemap.xml", true)).text();
+    expect(html).toContain('<a class="url" href="/sitemap.xml?sitemap=companies">companies</a>');
+  });
+
+  it("splits a named sitemap past 50,000 addresses into parts the index lists", async () => {
+    const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `/p/${i}` }));
+    const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, sitemaps: { products: () => many } });
+    expect(locs(await (await get(big)).text())).toEqual([
+      "https://www.example.com/sitemap.xml?sitemap=pages",
+      // & is written &amp; in XML.
+      "https://www.example.com/sitemap.xml?sitemap=products&amp;part=1",
+      "https://www.example.com/sitemap.xml?sitemap=products&amp;part=2",
+    ]);
+    expect(locs(await (await get(big, "/sitemap.xml?sitemap=products&part=2")).text())).toEqual(["https://www.example.com/p/50000"]);
+  });
+
+  it("refuses a sitemap name that would clash or break the address", () => {
+    expect(() => createSitemap({ sitemaps: { pages: () => [] } })).toThrow(/not "pages"/);
+    expect(() => createSitemap({ sitemaps: { "a b": () => [] } })).toThrow(/can't name a sitemap/);
+  });
+
   it("names a broken manifest instead of serving an empty sitemap", () => {
     expect(() => createSitemap({ manifest: {} })).toThrow(/maisongr-sitemap build/);
   });
