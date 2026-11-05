@@ -1,4 +1,4 @@
-import { dateOf, expand, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
+import { dateOf, expand, matches, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
 import { indexXml, MAX_URLS, newest, urlsetXml } from "./xml.js";
@@ -11,9 +11,9 @@ export type SitemapOptions = {
   locales?: Locales;
   /** Values for dynamic routes, keyed by pattern: { "/blog/[slug]": async () => [{ slug: "hello" }] }. */
   params?: ExpandOptions["params"];
-  /** Addresses no route file describes. */
+  /** Addresses no route file describes. A `loc` may be a path ("/press"), resolved against `site`. */
   entries?: () => EntryInput[] | Promise<EntryInput[]>;
-  /** Paths to leave out: exact paths, prefixes ("/drafts/") or patterns. */
+  /** Paths to leave out, from routes and `entries` alike: exact paths, prefixes ("/drafts/") or patterns. */
   exclude?: (string | RegExp)[];
   trailingSlash?: boolean;
   /** Seconds the list of addresses is kept before params and entries run again. Default 3600. */
@@ -71,10 +71,14 @@ export function createSitemap(options: SitemapOptions): (request: Request) => Pr
       const entries = (async () => {
         const locales = options.locales ?? manifest.locales;
         const fromRoutes = await expand(manifest.routes, { ...options, locales, site });
-        const extra = (options.entries ? await options.entries() : []).map(({ lastmod, ...e }) => {
-          const day = dateOf(lastmod);
-          return day ? { ...e, lastmod: day } : e;
-        });
+        const extra = (options.entries ? await options.entries() : [])
+          .map(({ lastmod, ...e }) => {
+            const loc = e.loc.startsWith("/") ? `${site}${e.loc}` : e.loc;
+            if (!URL.canParse(loc)) throw new Error(`@maison-gr/sitemap: entries gave "${e.loc}", which is neither an address nor a path.`);
+            const day = dateOf(lastmod);
+            return day ? { ...e, loc, lastmod: day } : { ...e, loc };
+          })
+          .filter((e) => !matches(new URL(e.loc).pathname, options.exclude ?? []));
         const seen = new Set(fromRoutes.map((e) => e.loc));
         return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc))];
       })();

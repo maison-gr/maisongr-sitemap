@@ -116,6 +116,15 @@ describe("createSitemap", () => {
     expect(await (await get(dated)).text()).toContain("<lastmod>2026-10-31</lastmod>");
   });
 
+  it("resolves relative entries against the site and applies exclude to them too", async () => {
+    const extra = createSitemap({
+      manifest: { ...manifest, routes: [], locales: undefined },
+      entries: () => [{ loc: "/press" }, { loc: "/drafts/next" }, { loc: "https://www.example.com/team" }],
+      exclude: ["/drafts/"],
+    });
+    expect(locs(await (await get(extra)).text())).toEqual(["https://www.example.com/press", "https://www.example.com/team"]);
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

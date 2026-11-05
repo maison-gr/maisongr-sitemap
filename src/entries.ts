@@ -71,7 +71,7 @@ function localeSegment(pattern: string, locales?: Locales): string | null {
   return names.find((n) => first === `[${n}]`) ?? null;
 }
 
-const matches = (path: string, rules: (string | RegExp)[]) =>
+export const matches = (path: string, rules: (string | RegExp)[]) =>
   rules.some((r) => (typeof r === "string" ? path === r || path.startsWith(r.endsWith("/") ? r : `${r}/`) : r.test(path)));
 
 /** Dynamic routes that would be left out because nothing supplies their values. */
