@@ -65,7 +65,10 @@ export function nextFonts(layoutSource: string, layoutDir: string): FontSource[]
   return assignRoles(out) as FontSource[];
 }
 
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
+/** A WOFF2 file starts with the signature "wOF2". */
+export const isWoff2 = (bytes: Uint8Array) => bytes.length > 4 && bytes[0] === 0x77 && bytes[1] === 0x4f && bytes[2] === 0x46 && bytes[3] === 0x32;
+
+const UA ="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** Downloads a Google font's Latin files once, at build time, so the page serves them from the site itself. */
@@ -109,7 +112,10 @@ async function google(family: string, role: FontRole, publicDir: string): Promis
     try {
       const res = await fetch(url, { headers: { "User-Agent": UA } });
       if (!res.ok) continue;
-      writeFileSync(join(dir, file), Buffer.from(await res.arrayBuffer()));
+      const bytes = Buffer.from(await res.arrayBuffer());
+      // Only a real WOFF2 file is written: an error page or anything else served at that address is not.
+      if (!isWoff2(bytes)) continue;
+      writeFileSync(join(dir, file), bytes);
       files.push({ url: `/${FONT_DIR}/${file}`, weight, style });
     } catch {
       continue;

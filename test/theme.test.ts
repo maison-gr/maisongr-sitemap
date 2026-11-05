@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { blocks, scopes } from "../src/build/css.js";
 import { cssFonts } from "../src/build/css-fonts.js";
-import { nextFonts } from "../src/build/fonts.js";
+import { isWoff2, nextFonts } from "../src/build/fonts.js";
 import { contrast, palette } from "../src/build/palette.js";
 
 const dirs: string[] = [];
@@ -86,6 +86,12 @@ describe("fonts from next/font", () => {
       { kind: "google", family: "Atkinson Hyperlegible Next", role: "body" },
       { kind: "google", family: "IBM Plex Mono", role: "mono" },
     ]);
+  });
+
+  it("writes a downloaded font only when it really is a WOFF2 file", () => {
+    expect(isWoff2(new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0x00, 0x01]))).toBe(true);
+    expect(isWoff2(new TextEncoder().encode("<!doctype html><title>Error</title>"))).toBe(false);
+    expect(isWoff2(new Uint8Array([0x77, 0x4f, 0x46]))).toBe(false);
   });
 
   it("finds local next/font fonts", () => {
