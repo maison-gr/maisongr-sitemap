@@ -47,15 +47,16 @@ export function existingRoutes(detected: ServerKind): string[] {
   return exts.map((e) => join("server", "routes", `sitemap.xml.${e}`));
 }
 
-export function routeSource(detected: ServerKind, ts: boolean): string {
+export function routeSource(detected: ServerKind, ts: boolean, options: { cacheComponents?: boolean } = {}): string {
   if (detected.kind === "next") {
+    const dynamic = options.cacheComponents
+      ? "// The answer depends on the request's Sec-Fetch-Dest header. With cacheComponents, reading the request keeps the route dynamic.\n"
+      : `// The answer depends on the request's Sec-Fetch-Dest header, so the route stays dynamic.\nexport const dynamic = "force-dynamic";\n`;
     return `${HEADER("./manifest.json")}
 import { sitemap } from "@maison-gr/sitemap/next";
 import manifest from "./manifest.json";
 
-// The answer depends on the request's Sec-Fetch-Dest header, so the route stays dynamic.
-export const dynamic = "force-dynamic";
-
+${dynamic}
 export const GET = sitemap({
   manifest,
 ${PARAMS_HINT(`{ "/blog/[slug]": async () => (await getPosts()).map((p) => ({ slug: p.slug, lastmod: p.updatedAt })) }`)}

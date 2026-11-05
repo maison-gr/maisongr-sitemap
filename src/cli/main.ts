@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
-import { buildNext, type BuildReport } from "../build/next-build.js";
+import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { withBuildStep, withStaticStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
 import { existingRoutes, LABEL, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
@@ -114,7 +114,7 @@ async function initServer(fw: ServerKind) {
 
   if (!existsSync(route)) {
     mkdirSync(dirname(route), { recursive: true });
-    writeFileSync(route, routeSource(fw, route.endsWith(".ts")));
+    writeFileSync(route, routeSource(fw, route.endsWith(".ts"), { cacheComponents: fw.kind === "next" && usesCacheComponents(root) }));
   }
   say(`\n  Wrote  ${rel(route)}`);
   say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
@@ -175,7 +175,11 @@ async function build() {
     say(`@maison-gr/sitemap: ${LABEL[fw.kind]} builds static files here; the sitemap is written after the build by \`maisongr-sitemap static\`.`);
     return;
   }
-  if (!existingRoutes(fw).some((f) => existsSync(join(root, f)))) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
+  const route = existingRoutes(fw).find((f) => existsSync(join(root, f)));
+  if (!route) fail("No sitemap route yet. Run `maisongr-sitemap init` first.");
+  if (fw.kind === "next" && usesCacheComponents(root) && /export\s+const\s+dynamic\b/.test(readFileSync(join(root, route!), "utf8"))) {
+    say(`@maison-gr/sitemap: cacheComponents is on, and it refuses the \`dynamic\` export in ${route!.split("\\").join("/")}. Remove that line: the route stays dynamic without it.`);
+  }
   const report = fw.kind === "next" ? await buildNext(root, fw, { offline: flag("offline") }) : await buildFramework(root, fw, { offline: flag("offline") });
   if (report.rebuilt) say(`@maison-gr/sitemap: ${REBUILT}`);
   say(`@maison-gr/sitemap: ${plural(report.routes, "page")}, ${report.dated} dated → ${rel(report.manifestPath)}`);

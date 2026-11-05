@@ -40,6 +40,17 @@ export function nextConfigOf(root: string): { basePath?: string; trailingSlash?:
   return { ...(basePath ? { basePath } : {}), ...(trailingSlash ? { trailingSlash } : {}) };
 }
 
+/**
+ * Next.js 16's cacheComponents (dynamicIO before it) refuses a route's
+ * `dynamic` export; a route that reads the request is rendered on each
+ * request there without it.
+ */
+export function usesCacheComponents(root: string): boolean {
+  const file = NEXT_CONFIGS.map((f) => join(root, f)).find(existsSync);
+  const src = file ? read(file).replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/[^\n]*/g, "$1") : "";
+  return /\b(cacheComponents|dynamicIO)\s*:\s*true\b/.test(src);
+}
+
 export function layoutOf(root: string, appDir?: string): string | undefined {
   if (!appDir) return undefined;
   return ["layout.tsx", "layout.jsx", "layout.ts", "layout.js"].map((n) => join(root, appDir, n)).find(existsSync);

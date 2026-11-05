@@ -47,6 +47,17 @@ describe("init", () => {
     expect(result.err).toContain("pages/sitemap.xml.ts already serves /sitemap.xml");
   });
 
+  it("leaves out the dynamic export under Next.js 16's cacheComponents, which refuses it", async () => {
+    const root = project({ ...NEXT, "next.config.ts": "const nextConfig = { cacheComponents: true };\nexport default nextConfig;" });
+    expect((await run(["init", "--offline"], root)).code).toBe(0);
+    const route = readFileSync(join(root, "app/sitemap.xml/route.js"), "utf8");
+    expect(route).not.toMatch(/export\s+const\s+dynamic/);
+    expect(route).toContain("export const GET = sitemap({");
+
+    writeFileSync(join(root, "app/sitemap.xml/route.js"), `export const dynamic = "force-dynamic";\n${route}`);
+    expect((await run(["build", "--offline"], root)).out).toContain("cacheComponents is on, and it refuses the `dynamic` export");
+  });
+
   it("refuses to replace a sitemap route that is not its own, and changes nothing", async () => {
     const root = project({ ...NEXT, "app/sitemap.xml/route.js": "export function GET() {}" });
     const { code, err } = await run(["init", "--offline"], root);
