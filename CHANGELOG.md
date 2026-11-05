@@ -6,7 +6,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ### Added
 
-- `init --replace` takes over from another sitemap: next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or a sitemap in the public folder, with its `.xsl` file. The old files move to `.sitemap-replaced/`, nothing is deleted, the old tool leaves the scripts and the Astro or Nuxt config, and next-sitemap's `siteUrl` is kept. `init` without the flag stops as before, and now says this is possible.
+- `init --replace` takes over from another sitemap: next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or a sitemap in the public folder, with its `.xsl` file. The old files move to `.sitemap-replaced/`, nothing is deleted, the old tool leaves the scripts and the Astro or Nuxt config (copied aside first), and next-sitemap's `siteUrl` is kept. It warns about rules that don't carry over, and about Astro's address changing from `/sitemap-index.xml` to `/sitemap.xml`. `init` without the flag stops as before, and now says this is possible.
 - `--json` on any command prints one report on stdout, for scripts and coding agents.
 - `maisongr-sitemap mcp` serves the commands as tools over the Model Context Protocol (stdio).
 - An Agent Skill (`npx skills add maison-gr/sitemap`) and `llms.txt`, both in the package.

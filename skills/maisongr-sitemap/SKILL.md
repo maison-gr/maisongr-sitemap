@@ -45,7 +45,8 @@ npx maisongr-sitemap init --replace --json
 It moves the old files to `.sitemap-replaced/`, including `.xsl` stylesheets and `next-sitemap.config.*`, and takes the old tool out of the scripts and the Astro or Nuxt config. It deletes nothing and leaves the old package installed, so afterwards:
 
 - run the `npm uninstall` line from the report;
-- if the report says addresses written in code don't carry over, read `.sitemap-replaced/` and move them into `params`, `entries` or `exclude`;
+- if the report says rules written in code don't carry over, read `.sitemap-replaced/` and move them into `params`, `entries` or `exclude` before the site deploys, because a page they left out may now be listed;
+- if the report says the address changes, update `robots.txt` and tell the user to submit `/sitemap.xml` in Search Console;
 - delete `.sitemap-replaced/` once the user has checked the result.
 
 ## Sites with no framework

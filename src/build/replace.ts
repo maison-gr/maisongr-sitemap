@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readPackage } from "./detect.js";
 
@@ -41,22 +41,31 @@ function cut(source: string, start: number, end: number): string {
   return /(^|\n)[ \t]*$/.test(before) && /^\r?\n/.test(rest) ? before.replace(/[ \t]+$/, "") + rest.replace(/^\r?\n/, "") : before + rest;
 }
 
-/** astro.config without @astrojs/sitemap's import and call, or null when it isn't written the usual way. */
-export function astroWithoutSitemap(source: string): string | null {
+/** astro.config without @astrojs/sitemap's import and call, and whether the call had options; null when it isn't written the usual way. */
+function astroEdit(source: string): { text: string; rules: boolean } | null {
   const name = source.match(/^\s*import\s+(\w+)\s+from\s+["']@astrojs\/sitemap["'];?[ \t]*\r?\n/m);
   if (!name) return null;
   const rest = source.replace(name[0], name[0].startsWith("\n") ? "\n" : "");
   const call = new RegExp(`\\b${name[1]}\\s*\\(`).exec(rest);
   if (!call) return null;
-  const end = closing(rest, call.index + call[0].length - 1);
-  return end === -1 ? null : cut(rest, call.index, end + 1);
+  const open = call.index + call[0].length - 1;
+  const end = closing(rest, open);
+  return end === -1 ? null : { text: cut(rest, call.index, end + 1), rules: rest.slice(open + 1, end).trim() !== "" };
 }
+
+export const astroWithoutSitemap = (source: string) => astroEdit(source)?.text ?? null;
 
 /** nuxt.config without a sitemap module named in `modules`, or null when it isn't written as a plain string there. */
 export function nuxtWithoutSitemap(source: string, rival: string): string | null {
   const entry = new RegExp(`["']${rival.replace("/", "\\/")}["']`).exec(source);
   if (!entry || /\[\s*$/.test(source.slice(0, entry.index)) && /^\s*,\s*\{/.test(source.slice(entry.index + entry[0].length))) return null;
   return cut(source, entry.index, entry.index + entry[0].length);
+}
+
+/** The same, with whether a top-level `sitemap` key still holds the module's options. */
+function nuxtEdit(source: string, rival: string): { text: string; rules: boolean } | null {
+  const text = nuxtWithoutSitemap(source, rival);
+  return text === null ? null : { text, rules: /^\s*sitemap\s*:/m.test(text) };
 }
 
 export type Replacement = {
@@ -88,16 +97,22 @@ export function moveAside(root: string, file: string): string {
   return target;
 }
 
-/** Edits the framework's config so it stops loading the rival. Says which file changed, or which needs a person. */
-export function dropFromConfig(root: string, rival: string): { file: string; done: boolean } | undefined {
+/**
+ * Edits the framework's config so it stops loading the rival, keeping the file
+ * as it was in the aside folder. Says which file changed, or which needs a
+ * person, and whether it held sitemap rules the new route won't apply.
+ */
+export function dropFromConfig(root: string, rival: string): { file: string; done: boolean; rules?: boolean } | undefined {
   const astro = rival === "@astrojs/sitemap";
   if (!astro && !rival.includes("nuxt")) return undefined;
   const file = (astro ? ASTRO_CONFIGS : NUXT_CONFIGS).find((f) => existsSync(join(root, f)));
   if (!file) return undefined;
   const source = readFileSync(join(root, file), "utf8");
   if (!source.includes(rival)) return undefined;
-  const next = astro ? astroWithoutSitemap(source) : nuxtWithoutSitemap(source, rival);
-  if (next === null) return { file, done: false };
-  writeFileSync(join(root, file), next);
-  return { file, done: true };
+  const edit = astro ? astroEdit(source) : nuxtEdit(source, rival);
+  if (edit === null) return { file, done: false };
+  mkdirSync(join(root, ASIDE), { recursive: true });
+  copyFileSync(join(root, file), join(root, ASIDE, file));
+  writeFileSync(join(root, file), edit.text);
+  return { file, done: true, rules: edit.rules };
 }

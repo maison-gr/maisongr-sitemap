@@ -187,13 +187,20 @@ function replaceSitemap(routes: string[], publicDir: string, rivals: string[]): 
       }),
     );
   }
+  let kept = plan.files.length > 0;
+  let rules = plan.files.some((f) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f));
   for (const rival of rivals) {
     const config = dropFromConfig(root, rival);
-    if (config?.done) u.ok(config.file, `${rival} taken out`);
-    else if (config) u.warn(`${config.file} still loads ${rival}`, "take it out by hand: it isn't written the usual way");
+    if (config?.done) {
+      kept = true;
+      rules ||= !!config.rules;
+      u.ok(config.file, `${rival} taken out; the file as it was is in ${ASIDE}/`);
+      if (config.rules && rival !== "@astrojs/sitemap") u.warn(`${config.file} still has a sitemap key`, "remove it once its rules are moved");
+    } else if (config) u.warn(`${config.file} still loads ${rival}`, "take it out by hand: it isn't written the usual way");
+    if (rival === "@astrojs/sitemap") u.warn("The address changes from /sitemap-index.xml to /sitemap.xml", "update robots.txt, and submit the new address in Search Console");
   }
-  if (plan.files.some((f) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f))) u.warn("Addresses and rules written in code don't carry over", `read them in ${ASIDE}/ and give them through params, entries or exclude`);
-  u.text(`Check the result, then delete ${ASIDE}/. Its files are all there, unchanged.`);
+  if (rules) u.warn("Addresses and rules written in code don't carry over", `read them in ${ASIDE}/ and give them through params, entries or exclude: a page left out before may now be listed`);
+  if (kept) u.text(`Check the result, then delete ${ASIDE}/. Its files are all there, unchanged.`);
   return rivals;
 }
 

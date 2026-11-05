@@ -83,11 +83,34 @@ describe("init --replace", () => {
   it("takes @astrojs/sitemap out of astro.config", async () => {
     const config = 'import { defineConfig } from "astro/config";\nimport sitemap from "@astrojs/sitemap";\nimport mdx from "@astrojs/mdx";\n\nexport default defineConfig({\n  site: "https://www.atelier.dev",\n  integrations: [mdx(), sitemap({ filter: (p) => !p.includes("x") })],\n});\n';
     const root = project({ "package.json": '{"scripts":{"build":"astro build"},"dependencies":{"astro":"7","@astrojs/sitemap":"3"}}', "astro.config.mjs": config, "src/pages/index.astro": "" });
-    expect((await run(["init", "--replace"], root)).code).toBe(0);
+    const { code, out } = await run(["init", "--replace"], root);
+    expect(code).toBe(0);
     const next = read(root, "astro.config.mjs");
     expect(next).not.toContain("sitemap");
     expect(next).toContain("integrations: [mdx()]");
     expect(JSON.parse(read(root, "package.json")).scripts.build).toBe("astro build && maisongr-sitemap static dist --site https://www.atelier.dev");
+    // The filter would otherwise vanish in silence, and a page it hid would be listed.
+    expect(read(root, ".sitemap-replaced/astro.config.mjs")).toBe(config);
+    expect(out).toContain("a page left out before may now be listed");
+    expect(out).toContain("/sitemap-index.xml to /sitemap.xml");
+  });
+
+  it("says nothing about rules or the aside folder when the config had neither to keep", async () => {
+    const root = project({ "package.json": '{"dependencies":{"next":"15","next-sitemap":"4"}}', "app/page.tsx": "" });
+    const { code, out } = await run(["init", "--offline", "--replace"], root);
+    expect(code).toBe(0);
+    expect(out).not.toContain(".sitemap-replaced");
+    expect(out).not.toContain("don't carry over");
+  });
+
+  it("keeps a Nuxt config as it was, and names the sitemap key left in it", async () => {
+    const config = 'export default defineNuxtConfig({\n  modules: ["@nuxtjs/sitemap"],\n  sitemap: { exclude: ["/secret"] },\n});\n';
+    const root = project({ "package.json": '{"dependencies":{"nuxt":"4","@nuxtjs/sitemap":"7"}}', "nuxt.config.ts": config, "app/app.vue": "" });
+    const { code, out } = await run(["init", "--offline", "--replace"], root);
+    expect(code).toBe(0);
+    expect(read(root, ".sitemap-replaced/nuxt.config.ts")).toBe(config);
+    expect(out).toContain("nuxt.config.ts still has a sitemap key");
+    expect(out).toContain("a page left out before may now be listed");
   });
 
   it("takes over from a sitemap in a single-page app's public folder", async () => {

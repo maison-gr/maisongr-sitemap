@@ -94,12 +94,14 @@ npx maisongr-sitemap init --replace
 
 It takes over from next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or a sitemap in your public folder, including one styled with an `.xsl` file. Run `init` without the flag first: it stops and names the first clash, and nothing changes.
 
-- **Nothing is deleted.** The old route, the `sitemap*.xml`, `.xsl` and `next-sitemap.config.*` files move to `.sitemap-replaced/`, under their own paths. Delete that folder once you've checked the result.
+- **Nothing is deleted.** The old route, the `sitemap*.xml`, `.xsl` and `next-sitemap.config.*` files move to `.sitemap-replaced/`, under their own paths, and an Astro or Nuxt config it edits is copied there first. Delete that folder once you've checked the result.
 - **The old tool stops running.** Its step leaves your scripts (`postbuild`, usually), and its entry leaves `astro.config` or `nuxt.config`. If a config isn't written the usual way, `init` names the file for you to edit.
 - **Your address is kept.** next-sitemap's `siteUrl` becomes the route's `site`.
 - **The package stays until you remove it.** `init` prints the `npm uninstall` line, so `package.json` and your lockfile stay in step.
 
-Rules written in code (next-sitemap's `exclude` and `transform`, a hand-written route's database query) don't carry over. `init` says so when it moves such a file. Read it in `.sitemap-replaced/`, then give the same rules through `params`, `entries` or `exclude`.
+Rules written in code (next-sitemap's `exclude` and `transform`, the options of `sitemap()` in `astro.config`, the `sitemap` key in `nuxt.config`, a hand-written route's database query) don't carry over, so a page they left out may now be listed. `init` warns you when it finds any. Read them in `.sitemap-replaced/`, then give the same rules through `params`, `entries` or `exclude`.
+
+`@astrojs/sitemap` serves `/sitemap-index.xml`, and this package serves `/sitemap.xml`. Update `robots.txt`, and submit the new address in Search Console.
 
 ## The route
 
