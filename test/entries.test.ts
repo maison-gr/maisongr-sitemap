@@ -175,6 +175,19 @@ describe("input built to be slow", () => {
     expect(performance.now() - start).toBeLessThan(500);
   });
 
+  it("reads a language type built to backtrack in linear time", async () => {
+    const { findLocales } = await import("../src/build/project.js");
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const dir = mkdtempSync(join(tmpdir(), "mgr-redos-"));
+    writeFileSync(join(dir, "slow.ts"), `type Lang = ${' "-"'.repeat(30)} x`);
+    writeFileSync(join(dir, "i18n.ts"), 'export type Lang = | "fr" | "en";');
+    const start = performance.now();
+    expect(findLocales([join(dir, "slow.ts"), join(dir, "i18n.ts")])).toEqual({ list: ["fr", "en"], default: "fr" });
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
   it("reads a route pattern full of brackets in linear time", async () => {
     const start = performance.now();
     await expand([{ pattern: `/${"[".repeat(100_000)}` }, { pattern: `/[${"[\\".repeat(50_000)}` }], { site });

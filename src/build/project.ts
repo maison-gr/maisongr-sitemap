@@ -41,7 +41,8 @@ export function findLocales(files: string[]): { list: string[]; default: string 
       src.match(/\blocales\s*:\s*\[([^\]]+)\]/) ??
       src.match(/\b(?:LOCALES|SUPPORTED_LOCALES|LANGUAGES)\s*(?::[^=]+)?=\s*\[([^\]]+)\]/) ??
       // A TypeScript union: export type Lang = "fr" | "en";
-      src.match(/\btype\s+(?:Lang|Locale|Language)s?\s*=\s*((?:\s*\|?\s*["'][\w-]+["'])+)\s*;/);
+      // Each repetition needs its own "|", so the pattern can match only one way (no backtracking blow-up).
+      src.match(/\btype\s+(?:Lang|Locale|Language)s?\s*=\s*\|?\s*(["'][\w-]+["'](?:\s*\|\s*["'][\w-]+["'])*)\s*;/);
     if (!locales) continue;
     const found = list(locales[1]!);
     if (found.length < 2) continue;
