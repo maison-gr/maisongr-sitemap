@@ -200,6 +200,17 @@ describe("createSitemap", () => {
     expect(xml).toContain("<image:loc>https://www.example.com/studio.jpeg</image:loc>");
   });
 
+  it("takes a site's readonly lists as they are (this test only compiles if it does)", async () => {
+    const images: readonly string[] = ["/cover.jpg"];
+    const slugs: readonly string[] = ["a", "b"];
+    const typed = createSitemap({
+      manifest: { ...manifest, routes: [{ pattern: "/docs/[...path]" }], locales: undefined },
+      params: { "/docs/[...path]": () => [{ path: slugs, images }] },
+      transform: (e) => ({ ...e, images }),
+    });
+    expect(await (await get(typed)).text()).toContain("<loc>https://www.example.com/docs/a/b</loc>");
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });

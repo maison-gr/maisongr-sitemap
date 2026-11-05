@@ -9,9 +9,9 @@ export type Entry = {
   /** Language of this address, when the site has more than one. */
   lang?: string;
   /** Images on the page, as absolute URLs or paths. Google reads up to 1,000 per page. */
-  images?: string[];
+  images?: readonly string[];
   /** Videos on the page, in Google's video sitemap fields. */
-  videos?: Video[];
+  videos?: readonly Video[];
   /** For a news publisher's articles from the last two days. */
   news?: News;
 };

@@ -4,7 +4,7 @@ import type { Entry, Route } from "./types.js";
 export type DateLike = string | Date | number;
 
 /** Values for a dynamic route's segments, e.g. { slug: "hello" }, with its own date if known. */
-export type ParamRow = { lastmod?: DateLike; images?: string[] } & Record<string, string | string[] | DateLike | undefined>;
+export type ParamRow = { lastmod?: DateLike; images?: readonly string[] } & Record<string, string | readonly string[] | DateLike | undefined>;
 
 /** A row's images, when it gives any: the page's own, for the image sitemap. */
 const imagesOf = (row: ParamRow) => (Array.isArray(row.images) && row.images.length ? { images: row.images } : {});
