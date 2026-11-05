@@ -474,13 +474,26 @@ function publicDirOf(found: ReturnType<typeof detect>): string | undefined {
 function placeFile(dir: string, name: string, body: string, what: string) {
   const file = join(root, dir, name);
   const shown = `${dir === "." ? "" : `${dir}/`}${name}`;
-  if (existsSync(file)) {
-    if (readFileSync(file, "utf8").trim() === body.trim()) return u.ok(shown, `${what}: already there`);
-    return u.warn(`${shown} is already there, with other content`, "kept as it is; remove it first to replace it");
-  }
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, body);
-  u.ok(shown, what);
+  try {
+    // "wx": created only if it isn't there, in one step, so nothing can appear between a check and the write.
+    writeFileSync(file, body, { flag: "wx" });
+    return u.ok(shown, what);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  if (readFileSync(file, "utf8").trim() === body.trim()) return u.ok(shown, `${what}: already there`);
+  u.warn(`${shown} is already there, with other content`, "kept as it is; remove it first to replace it");
+}
+
+/** A file's text, or null when there is none: one read, no separate check that could go stale. */
+function readOrNull(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 /**
@@ -508,7 +521,7 @@ async function runConnect() {
     else u.warn(`${rel(code)} writes robots.txt and does not name the sitemap`, `add "Sitemap: ${base}/sitemap.xml"${route ? " (the `sitemap` field)" : ""}`);
   } else {
     const file = join(root, publicDir!, "robots.txt");
-    const current = existsSync(file) ? readFileSync(file, "utf8") : null;
+    const current = readOrNull(file);
     const other = current && otherSitemap(current, base);
     const next = robotsWithSitemap(current, base);
     if (other) u.warn(`robots.txt names ${other}`, `not ${base}/sitemap.xml: change that line yourself if this one replaces it`);
@@ -516,7 +529,8 @@ async function runConnect() {
     else {
       const what = next.change === "created" ? `Create ${rel(file)}, allowing every crawler and naming the sitemap?` : `Add "Sitemap: ${base}/sitemap.xml" to ${rel(file)}?`;
       if (flag("yes") || (await ask(what))) {
-        writeFileSync(file, next.text);
+        // A new one is created only if none appeared while the question was open.
+        writeFileSync(file, next.text, { flag: next.change === "created" ? "wx" : "w" });
         u.ok(rel(file), next.change === "created" ? "created, naming the sitemap" : "the Sitemap line added at its end");
       } else u.warn(next.change === "created" ? `No robots.txt` : `${rel(file)} does not name the sitemap`, `left as it is; run again with --yes to ${next.change === "created" ? "create it" : "add the line"}`);
     }
@@ -622,10 +636,12 @@ async function runLlms() {
 
   const file = join(root, out!, "llms.txt");
   u.heading("Wrote");
-  if (existsSync(file) && !readFileSync(file, "utf8").includes(LLMS_MARK)) {
+  const current = readOrNull(file);
+  if (current !== null && !current.includes(LLMS_MARK)) {
     u.warn(`${rel(file)} is already there, written by hand`, "kept as it is: --stdout prints this one to compare or copy");
   } else {
-    writeFileSync(file, text);
+    // Created only if none appeared meanwhile; replaced only when the one there is this tool's.
+    writeFileSync(file, text, { flag: current === null ? "wx" : "w" });
     u.ok(rel(file), "run it again after content changes, or in your build");
   }
 }
