@@ -397,7 +397,8 @@ async function build() {
   if (report.rebuilt) u.warn(`maisongr-sitemap: ${REBUILT}`, REBUILT_NOTE);
   u.ok(`maisongr-sitemap: ${plural(report.routes, "page")}, ${report.dated} dated`, `→ ${rel(report.manifestPath)}`);
   // A route the route file already gives values for ("/blog/[slug]": …) is listed; only the others need a word.
-  const routeText = readFileSync(join(root, route!), "utf8");
+  // Comments set aside: the route init writes names "/blog/[slug]" in an example.
+  const routeText = readFileSync(join(root, route!), "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
   const missing = report.needParams.filter((p) => !routeText.includes(`"${p}"`) && !routeText.includes(`'${p}'`));
   if (missing.length) u.warn(`${plural(missing.length, "dynamic route")} not listed yet: ${missing.join(", ")}`, `give ${missing.length === 1 ? "its" : "their"} values in params`);
 }
