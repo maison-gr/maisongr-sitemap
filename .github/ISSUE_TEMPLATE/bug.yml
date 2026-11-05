@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in the sitemap, the page or the CLI is wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: A missing or extra page, a wrong date, a broken page, a command that failed…
+    validations:
+      required: true
+  - type: input
+    id: framework
+    attributes:
+      label: Framework and version
+      placeholder: Next.js 15.5, Astro 7.4, SvelteKit 3.0, Nuxt 4.6, Express 5…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "@maison-gr/sitemap version"
+      description: "`npx maisongr-sitemap --version`"
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Output of `npx maisongr-sitemap build` (or `init`)
+      description: It lists the pages found, the ones left out and why, the languages and the theme.
+      render: text
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The route files involved, or a link to a repository. Leave out anything private.

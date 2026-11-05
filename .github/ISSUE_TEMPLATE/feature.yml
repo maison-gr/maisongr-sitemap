@@ -1,0 +1,15 @@
+name: Feature request
+description: A framework, an option or a behaviour you need.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need, and why
+      description: The site and the situation it's for help more than a proposed API.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
