@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { astroRoutes } from "../src/build/astro-routes.js";
+import { nuxtRoutes } from "../src/build/nuxt-routes.js";
 import { svelteRoutes } from "../src/build/svelte-routes.js";
 
 const dirs: string[] = [];
@@ -82,5 +83,41 @@ describe("SvelteKit routes", () => {
       { pattern: "/inbox", reason: "noindex" },
       { pattern: "/account", reason: "private page (account)" },
     ]);
+  });
+});
+
+describe("Nuxt routes", () => {
+  it("follows Nuxt's page conventions and leaves out what it ignores", () => {
+    const root = project({
+      "app/pages/index.vue": "",
+      "app/pages/blog.vue": "<NuxtPage />",
+      "app/pages/blog/index.vue": "",
+      "app/pages/blog/[slug].vue": "",
+      "app/pages/[[lang]]/about.vue": "",
+      "app/pages/docs/[...path].vue": "",
+      "app/pages/users-[group]/[id].vue": "",
+      "app/pages/(shop)/cart.client.vue": "",
+      "app/pages/-draft.vue": "",
+      "app/pages/blog/[slug].spec.ts": "",
+      "app/pages/types.d.ts": "",
+      "app/pages/settings.vue": "",
+      "app/pages/preview.vue": "<script setup>useSeoMeta({ robots: 'noindex, nofollow' })</script>",
+    });
+    const found = nuxtRoutes(root, "app/pages");
+    expect(patterns(found)).toEqual(["/", "/[[lang]]/about", "/blog", "/blog/[slug]", "/cart", "/docs/[[...path]]", "/users-[group]/[id]"]);
+    expect(found.routes.find((r) => r.pattern === "/blog")!.files).toEqual(["app/pages/blog/index.vue", "app/pages/blog.vue"]);
+    expect(found.skipped).toEqual([
+      { pattern: "/preview", reason: "noindex" },
+      { pattern: "/settings", reason: "private page (settings)" },
+    ]);
+  });
+
+  it("follows a hiding helper imported through ~/ into app/", () => {
+    const root = project({
+      "app/utils/seo.ts": "export const noindexMeta = () => useSeoMeta({ robots: 'noindex' });",
+      "app/pages/index.vue": "",
+      "app/pages/beta.vue": '<script setup>import { noindexMeta } from "~/utils/seo"; noindexMeta();</script>',
+    });
+    expect(patterns(nuxtRoutes(root, "app/pages"))).toEqual(["/"]);
   });
 });

@@ -41,17 +41,21 @@ export const toPosix = (p: string) => p.split(sep).join("/");
 /** Helpers whose name says they hide a page, e.g. privatePageMetadata(), noIndexMetadata(). */
 const HIDING_HELPER = /private|no-?index|unlisted|hidden/i;
 
-/** The file an import names, for "@/…" (src/ or the root) and relative specifiers. */
+/**
+ * The file an import names: relative, or through the "@/" and "~/" aliases,
+ * which point at src/ (Next.js), the root, or app/ (Nuxt 4), whichever has it.
+ */
 function moduleFile(root: string, from: string, spec: string): string | null {
-  const base = spec.startsWith("@/")
-    ? join(root, existsSync(join(root, "src")) ? "src" : "", spec.slice(2))
+  const bases = spec.startsWith("@/") || spec.startsWith("~/")
+    ? ["src", "", "app"].map((dir) => join(root, dir, spec.slice(2)))
     : spec.startsWith(".")
-      ? join(from, "..", spec)
-      : null;
-  if (!base) return null;
-  for (const ext of ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js"]) {
-    const f = base + ext;
-    if (existsSync(f) && statSync(f).isFile()) return f;
+      ? [join(from, "..", spec)]
+      : [];
+  for (const base of bases) {
+    for (const ext of ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js"]) {
+      const f = base + ext;
+      if (existsSync(f) && statSync(f).isFile()) return f;
+    }
   }
   return null;
 }
