@@ -1,0 +1,48 @@
+{
+  "name": "@maison-gr/sitemap",
+  "version": "0.1.0",
+  "description": "One sitemap, two readers: the XML search engines need, and a page in your site's own design for people. Detects your stack, finds your pages, dates them from Git.",
+  "license": "MIT",
+  "author": "Maison GR (https://www.maisongr.com)",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "bin": {
+    "maisongr-sitemap": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "default": "./dist/next.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "sitemap",
+    "sitemap.xml",
+    "seo",
+    "nextjs",
+    "xslt",
+    "hreflang",
+    "lastmod"
+  ],
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}
