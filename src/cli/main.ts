@@ -15,6 +15,7 @@ const HELP = `@maison-gr/sitemap
 
   Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
             --site      the address the site is served at (init, for a static build)
+            --images    (static) list each page's <img> and og:image in an image sitemap
             --version   print the version          --help        print this
 `;
 
@@ -206,7 +207,7 @@ function runStatic() {
   const site = value("site") ?? process.env.SITEMAP_SITE_URL;
   if (!dir || !existsSync(join(root, dir))) fail("Usage: maisongr-sitemap static <build-dir> --site https://your.site");
   if (!site || !/^https?:\/\//.test(site)) fail("Give the address the site is served at: --site https://your.site");
-  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit") });
+  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images") });
   say(`\n  ${plural(report.pages, "page")} · theme: ${report.theme.name}${report.theme.dark ? " (light and dark)" : ""}`);
   for (const s of report.skipped) say(`  Left out ${s.path}  ${s.reason}`);
   for (const f of report.written) say(`  Wrote ${dir}/${f}`);

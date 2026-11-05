@@ -51,7 +51,15 @@ function siteFonts(css: string): Font[] {
  * sitemap.xml (styled by sitemap.css) for crawlers, and the designed page at
  * /sitemap/ for people, from the HTML files of the build output.
  */
-export function buildStatic(dir: string, site: string, options: { name?: string; credit?: boolean } = {}): StaticReport {
+/** A page's own images: its og:image and <img> sources, not inline data. */
+function imagesIn(html: string, pageUrl: string): string[] {
+  const og = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).filter((t) => /property\s*=\s*["']og:image["']/i.test(t)).map((t) => attr(t, "content"));
+  const img = [...html.matchAll(/<img\b[^>]*>/gi)].map((t) => attr(t[0], "src"));
+  const urls = [...og, ...img].filter((u): u is string => !!u && !u.startsWith("data:")).map((u) => new URL(u.replace(/&amp;/g, "&"), pageUrl).href);
+  return [...new Set(urls)];
+}
+
+export function buildStatic(dir: string, site: string, options: { name?: string; credit?: boolean; images?: boolean } = {}): StaticReport {
   const base = site.replace(/\/+$/, "");
   const files = walk(dir);
   const skipped: StaticReport["skipped"] = [];
@@ -80,7 +88,8 @@ export function buildStatic(dir: string, site: string, options: { name?: string;
       .map((t) => t[0])
       .filter((t) => /rel\s*=\s*["']alternate["']/i.test(t) && attr(t, "hreflang"))
       .map((t) => ({ hreflang: attr(t, "hreflang")!, href: new URL(attr(t, "href") ?? "/", `${base}/`).href }));
-    entries.push({ loc: `${base}${path}`, ...(lang ? { lang } : {}), ...(alternates.length ? { alternates } : {}) });
+    const images = options.images ? imagesIn(html, `${base}${path}`) : [];
+    entries.push({ loc: `${base}${path}`, ...(lang ? { lang } : {}), ...(alternates.length ? { alternates } : {}), ...(images.length ? { images } : {}) });
   }
   entries.sort((a, b) => a.loc.localeCompare(b.loc));
 

@@ -249,6 +249,22 @@ describe("static sites", () => {
     expect(report.theme).toMatchObject({ name: "Atelier", icon: "/favicon.svg", light: { background: "#f6f3ee", foreground: "#16130f" } });
   });
 
+  it("lists each page's images when asked, and only then", () => {
+    const root = project({
+      "dist/index.html": '<html><head><meta property="og:image" content="https://cdn.atelier.dev/og.png"></head><body><img src="/hero.jpg?w=1200&amp;q=80"><img src="data:image/gif;base64,R0lGOD"><img src="/hero.jpg?w=1200&amp;q=80"></body></html>',
+      "dist/work/index.html": '<html><body><img src="cover.png"></body></html>',
+    });
+    buildStatic(join(root, "dist"), "https://atelier.dev");
+    expect(readFileSync(join(root, "dist/sitemap.xml"), "utf8")).not.toContain("image:");
+    buildStatic(join(root, "dist"), "https://atelier.dev", { images: true });
+    const xml = readFileSync(join(root, "dist/sitemap.xml"), "utf8");
+    expect([...xml.matchAll(/<image:loc>([^<]+)<\/image:loc>/g)].map((m) => m[1])).toEqual([
+      "https://cdn.atelier.dev/og.png",
+      "https://atelier.dev/hero.jpg?w=1200&amp;q=80",
+      "https://atelier.dev/work/cover.png",
+    ]);
+  });
+
   it("does not read its own sitemap.css back as the site's theme on the next build", () => {
     const root = project({ "dist/index.html": "<html><style>:root{--background:#fff;--foreground:#111}</style></html>" });
     buildStatic(join(root, "dist"), "https://atelier.dev");
