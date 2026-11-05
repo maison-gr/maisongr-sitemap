@@ -17,6 +17,7 @@ const HELP = `maisongr-sitemap
   maisongr-sitemap indexnow --site <url> --key <key>
                                      Tell Bing and the other IndexNow engines which pages changed (after a deploy)
                                      --since <YYYY-MM-DD> (default: yesterday)  --all  --dry-run  --sitemap <file or url>
+                                     --wait [seconds]  wait for a deploy to serve the key first (default 180)
 
   Options:  --offline   do not download fonts      --no-credit   (static) leave out the footer credit
             --site      the address the site is served at (init, for a static build)
@@ -248,9 +249,18 @@ async function runIndexNow() {
 
   // The engines fetch the key from the site to prove the submission is the owner's.
   const keyFile = `${site}/${key}.txt`;
-  const served = await fetch(keyFile).then((r) => (r.ok ? r.text() : ""), () => "");
-  if (served.trim() !== key) {
-    fail(`${keyFile} does not serve the key. Put a file named ${key}.txt, containing only the key, in your public directory, deploy, and run this again.`);
+  const servesKey = () => fetch(keyFile).then((r) => (r.ok ? r.text() : ""), () => "").then((t) => t.trim() === key);
+  // --wait: right after a deploy, the new version (and its key file) may not be live yet.
+  const waitFor = flag("wait") ? Number(value("wait")) || 180 : 0;
+  const deadline = Date.now() + waitFor * 1000;
+  let served = await servesKey();
+  while (!served && Date.now() < deadline) {
+    say(`  Waiting for ${keyFile}… (${Math.round((deadline - Date.now()) / 1000)}s left)`);
+    await new Promise((r) => setTimeout(r, Math.min(10_000, Math.max(0, deadline - Date.now()))));
+    served = await servesKey();
+  }
+  if (!served) {
+    fail(`${keyFile} does not serve the key. Put a file named ${key}.txt, containing only the key, in your public directory, deploy, and run this again${waitFor ? "" : " (or add --wait to wait for a deploy)"}.`);
   }
 
   const since = flag("all") ? undefined : value("since") ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
@@ -266,6 +276,9 @@ async function runIndexNow() {
   }
   const results = await submit({ site: site!, key: key!, urls });
   for (const r of results) say(`  Batch ${r.batch}: ${plural(r.urls, "page")} → ${r.status} ${r.meaning}`);
+  if (results.some((r) => r.status === 403)) {
+    say(`  A 403 usually means the engine has not verified the site: add ${site}/ in Bing Webmaster Tools with its own verification (an import from Google Search Console is not always enough).`);
+  }
   if (results.some((r) => r.status >= 300)) fail("IndexNow did not accept every batch.");
   say();
 }

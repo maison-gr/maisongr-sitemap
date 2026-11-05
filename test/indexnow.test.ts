@@ -81,8 +81,24 @@ describe("the indexnow command", () => {
     const { code, out, err } = await run(["indexnow", "--site", site, "--key", KEY, "--all", "--sitemap", "sitemap.xml"], root);
     expect(out).toContain("3 pages in the sitemap");
     expect(out).toContain("403 the key was not found");
+    expect(out).toContain("add https://www.atelier.dev/ in Bing Webmaster Tools");
     expect(code).toBe(1);
     expect(err).toContain("did not accept every batch");
+  });
+
+  it("with --wait, waits for a deploy to serve the key before sending", async () => {
+    let checks = 0;
+    const sent: unknown[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return sent.push(init.body), new Response(null, { status: 200 });
+      if (url.endsWith(`${KEY}.txt`)) return ++checks < 2 ? new Response("Not found", { status: 404 }) : new Response(KEY);
+      return new Response(sitemap);
+    });
+    const { code, out } = await run(["indexnow", "--site", site, "--key", KEY, "--all", "--wait", "1"]);
+    expect(code).toBe(0);
+    expect(checks).toBe(2);
+    expect(out).toContain(`Waiting for ${site}/${KEY}.txt`);
+    expect(sent).toHaveLength(1);
   });
 
   it("refuses a key the protocol would refuse", async () => {
