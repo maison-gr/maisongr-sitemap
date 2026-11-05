@@ -118,8 +118,10 @@ describe("a hand-written HTML site", () => {
 describe("crawl", () => {
   /** A site written in nothing the package can read: every page made at request time, as PHP would. */
   async function site(pages: Record<string, (req: { url: string }) => { status?: number; headers?: Record<string, string>; body?: string }>): Promise<string> {
+    const routes = new Map(Object.entries(pages));
     const server = createServer((req, res) => {
-      const handler = pages[req.url!.split("?")[0]!];
+      // A Map, so a request for /constructor or /__proto__ finds no handler rather than an object's own method.
+      const handler = routes.get(req.url!.split("?")[0]!);
       const out = handler ? handler({ url: req.url! }) : { status: 404, body: "not found" };
       res.writeHead(out.status ?? 200, { "content-type": "text/html; charset=utf-8", ...out.headers });
       res.end(out.body ?? "");
