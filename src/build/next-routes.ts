@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { isNoindex, privateOf, toPosix, type FoundRoute, type Skipped } from "./route-rules.js";
+import { emptyPageReason, isNoindex, privateOf, toPosix, type FoundRoute, type Skipped } from "./route-rules.js";
 
 export type { FoundRoute, Skipped };
 
@@ -36,6 +36,7 @@ export function appRoutes(root: string, appDir: string): { routes: FoundRoute[];
       const pattern = "/" + segments.filter(Boolean).join("/");
       const privateSegment = privateOf(segments);
       if (privateSegment) skipped.push({ pattern, reason: `private page (${privateSegment})` });
+      else if (emptyPageReason(join(dir, page))) skipped.push({ pattern, reason: emptyPageReason(join(dir, page))! });
       else if (noindex || isNoindex(root, join(dir, page))) skipped.push({ pattern, reason: "noindex" });
       else routes.push({ pattern, files: here.filter((n) => SOURCE.test(n)).map((n) => toPosix(relative(root, join(dir, n)))) });
     }

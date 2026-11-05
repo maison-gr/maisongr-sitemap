@@ -70,6 +70,20 @@ function moduleFile(root: string, from: string, spec: string): string | null {
   return null;
 }
 
+/**
+ * Why a page has nothing to list, if so: it only answers "not found" (a
+ * [...missing] catch-all giving each language its 404) or only sends the
+ * visitor elsewhere (an old address kept as a redirect). Either way it calls
+ * notFound() or redirect() and never returns anything to render.
+ */
+export function emptyPageReason(file: string): string | null {
+  const src = read(file);
+  if (/\breturn\b/.test(src)) return null;
+  if (/\b(permanentRedirect|redirect)\s*\(/.test(src)) return "redirect";
+  if (/\bnotFound\s*\(\s*\)/.test(src)) return "not-found page";
+  return null;
+}
+
 /** A page or layout is noindex when it says so, or calls a local helper named for hiding that does. */
 export function isNoindex(root: string, file: string): boolean {
   const src = read(file);

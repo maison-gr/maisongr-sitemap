@@ -211,6 +211,30 @@ describe("next.config", () => {
   });
 });
 
+describe("a site with no root layout, languages as a TypeScript type, and a not-found catch-all", () => {
+  it("reads it all from app/[lang]/layout.tsx and src/lib/i18n.ts", async () => {
+    const root = project({
+      "package.json": '{"name":"maison-gr","dependencies":{"next":"16"}}',
+      "src/app/[lang]/layout.tsx": `import "@/index.css";\nexport const metadata = { openGraph: { siteName: "Maison GR" } };`,
+      "src/index.css": ":root{--background:#f4f2ee;--foreground:#141414}",
+      "src/app/[lang]/page.tsx": "",
+      "src/app/[lang]/work/page.tsx": "",
+      "src/app/[lang]/[...missing]/page.tsx": `import { notFound } from "next/navigation";\nexport default function MissingPage() {\n  notFound();\n}`,
+      "src/app/[lang]/work/[slug]/page.tsx": `export default async function P({ params }) { const p = await get(params); if (!p) notFound(); return <h1 />; }`,
+      "src/app/[lang]/resistaa/page.tsx": `import { redirect } from "next/navigation";\nexport default async function Legacy({ params }) {\n  const { lang } = await params;\n  redirect(\`/\${lang}/work/resistaa\`);\n}`,
+      "src/lib/i18n.ts": 'export type Lang = "fr" | "en";\nexport const translations = {};',
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.locales).toEqual({ list: ["fr", "en"], default: "fr" });
+    expect(report.theme).toMatchObject({ name: "Maison GR", light: { background: "#f4f2ee" } });
+    expect([...report.skipped].sort((a, b) => a.pattern.localeCompare(b.pattern))).toEqual([
+      { pattern: "/[lang]/[...missing]", reason: "not-found page" },
+      { pattern: "/[lang]/resistaa", reason: "redirect" },
+    ]);
+    expect(report.needParams).toEqual(["/[lang]/work/[slug]"]);
+  });
+});
+
 describe("languages added by middleware", () => {
   it("prefixes every route when the middleware routes by locale and there is no [locale] folder", async () => {
     const root = project({
