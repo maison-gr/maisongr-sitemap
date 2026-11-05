@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-05
+
+Found by testing AquaDrill, a Vite app on a static host, as its visitors and search engines see it.
+
 ### Added
 
 - `maisongr-sitemap/vite`: a Vite plugin that serves the sitemap during `vite dev`, where the build's static step never runs and the app's catch-all route answered `/sitemap.xml` with its 404. A browser opening `/sitemap.xml` gets the page and a crawler the XML, as in production with the host rule now documented under "One address on a static host" (Cloudflare and Vercel). It answers `/sitemap.xml`, `/sitemap/` and their files from the router's routes and the source stylesheets, the same files the build writes, and reads the routes again on each request.
@@ -134,6 +138,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.5.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.5.0
 [1.4.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.1
 [1.4.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.0
 [1.3.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.3.0
