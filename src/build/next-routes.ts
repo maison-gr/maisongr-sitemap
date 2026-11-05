@@ -74,7 +74,7 @@ export function pagesRoutes(root: string, pagesDir: string): { routes: FoundRout
       const privateSegment = privateOf(parts);
       if (privateSegment) skipped.push({ pattern, reason: `private page (${privateSegment})` });
       else if (isNoindex(root, full)) skipped.push({ pattern, reason: "noindex" });
-      else routes.push({ pattern, files: [toPosix(relative(root, full))] });
+      else routes.push({ pattern, files: [toPosix(relative(root, full))], page: toPosix(relative(root, full)) });
     }
   }
 

@@ -147,8 +147,8 @@ export async function buildNext(
   return { ...report, needParams: report.needParams.filter((p) => !fromPages.some((r) => r.pattern === p)), fromPages: fromPages.map((r) => r.pattern) };
 }
 
-/** export function generateStaticParams, export async function…, or export const generateStaticParams = … */
-const STATIC_PARAMS = /\bexport\s+(?:async\s+)?(?:function\s+generateStaticParams\b|const\s+generateStaticParams\s*=)/;
+/** export function generateStaticParams (or the Pages Router's getStaticPaths), async or as a const. */
+const STATIC_PARAMS = /\bexport\s+(?:async\s+)?(?:function\s+(?:generateStaticParams|getStaticPaths)\b|const\s+(?:generateStaticParams|getStaticPaths)\s*[:=])/;
 
 /** The file beside the route that hands each dynamic page's generateStaticParams to the sitemap, rewritten on every build. */
 export function paramsPathOf(root: string, appDir: string) {
@@ -164,7 +164,7 @@ function writeParamsFile(root: string, appDir: string, routes: FoundRoute[]) {
   const ts = file.endsWith(".ts");
   const lines = routes.map((r) => {
     const spec = toPosix(relative(dirname(file), join(root, r.page!))).replace(/\.(tsx|ts|jsx|js)$/, "");
-    return `  ${literal(r.pattern)}: staticParams(() => import(${literal(spec.startsWith(".") ? spec : `./${spec}`)})),`;
+    return `  ${literal(r.pattern)}: staticParams(() => import(${literal(spec.startsWith(".") ? spec : `./${spec}`)}), ${literal(r.pattern)}),`;
   });
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(

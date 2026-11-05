@@ -25,17 +25,53 @@ export function sitemap(options: SitemapOptions): SitemapHandler {
  * A page whose generateStaticParams fails is left out with a warning, rather
  * than taking the whole sitemap down with it.
  */
-export function staticParams(load: () => Promise<{ generateStaticParams?: (...args: any[]) => unknown }>): () => Promise<ParamRow[]> {
+export function staticParams(
+  load: () => Promise<{ generateStaticParams?: (...args: any[]) => unknown; getStaticPaths?: (...args: any[]) => unknown }>,
+  pattern?: string,
+): () => Promise<ParamRow[]> {
   return async () => {
     try {
       const page = await load();
-      const rows = await page.generateStaticParams?.({ params: {} });
-      return Array.isArray(rows) ? (rows as ParamRow[]) : [];
+      if (page.generateStaticParams) {
+        const rows = await page.generateStaticParams({ params: {} });
+        return Array.isArray(rows) ? (rows as ParamRow[]) : [];
+      }
+      // The Pages Router's getStaticPaths: { paths: [{ params }] } or { paths: ["/blog/hello"] }.
+      const result = (await page.getStaticPaths?.({ locales: undefined, defaultLocale: undefined })) as { paths?: unknown[] } | undefined;
+      return (result?.paths ?? []).flatMap((p): ParamRow[] => {
+        if (typeof p === "string") {
+          const row = pattern ? paramsFromPath(pattern, p) : null;
+          return row ? [row] : [];
+        }
+        const params = (p as { params?: ParamRow })?.params;
+        return params ? [params] : [];
+      });
     } catch (error) {
-      console.warn(`maisongr-sitemap: a page's generateStaticParams failed, so its addresses are left out: ${(error as Error).message}`);
+      console.warn(`maisongr-sitemap: a page's ${pattern ?? ""} static paths failed, so its addresses are left out: ${(error as Error).message}`);
       return [];
     }
   };
+}
+
+/** "/blog/hello" against "/blog/[slug]" → { slug: "hello" }; catch-alls take the rest, as an array. */
+function paramsFromPath(pattern: string, path: string): ParamRow | null {
+  const want = pattern.split("/").filter(Boolean);
+  const got = path.split("?")[0]!.split("/").filter(Boolean).map(decodeURIComponent);
+  const row: ParamRow = {};
+  for (let i = 0; i < want.length; i++) {
+    const seg = want[i]!;
+    const rest = seg.match(/^\[\[?\.\.\.(\w+)\]\]?$/);
+    if (rest) {
+      row[rest[1]!] = got.slice(i);
+      return row;
+    }
+    const one = seg.match(/^\[(\w+)\]$/);
+    if (one) {
+      if (got[i] === undefined) return null;
+      row[one[1]!] = got[i]!;
+    } else if (seg !== got[i]) return null;
+  }
+  return got.length === want.length ? row : null;
 }
 
 export type { SitemapHandler, SitemapOptions };

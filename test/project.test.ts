@@ -251,8 +251,29 @@ describe("dynamic pages that list their own values", () => {
     expect(report.fromPages).toEqual(["/[locale]/blog/[slug]", "/[locale]/practice/[scenarioSlug]"]);
     expect(report.needParams).toEqual(["/[locale]/notes/[id]"]);
     const params = readFileSync(join(root, "app/sitemap.xml/params.ts"), "utf8");
-    expect(params).toContain('"/[locale]/blog/[slug]": staticParams(() => import("../[locale]/blog/[slug]/page")),');
+    expect(params).toContain('"/[locale]/blog/[slug]": staticParams(() => import("../[locale]/blog/[slug]/page"), "/[locale]/blog/[slug]"),');
     expect(params).not.toContain("notes");
+  });
+
+  it("hands a Pages Router page's getStaticPaths to the sitemap", async () => {
+    const root = project({
+      "package.json": '{"dependencies":{"next":"16"}}',
+      "pages/index.tsx": "",
+      "pages/blog/[slug].tsx": "export const getStaticPaths: GetStaticPaths = async () => ({ paths: [], fallback: false });",
+      "pages/notes/[id].tsx": "export default function Note() { return null; }",
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.fromPages).toEqual(["/blog/[slug]"]);
+    expect(report.needParams).toEqual(["/notes/[id]"]);
+    expect(readFileSync(join(root, "app/sitemap.xml/params.js"), "utf8")).toContain('"/blog/[slug]": staticParams(() => import("../../pages/blog/[slug]"), "/blog/[slug]"),');
+  });
+
+  it("takes getStaticPaths as { params } rows or as paths", async () => {
+    const { staticParams } = await import("../src/next.js");
+    const paths = [{ params: { slug: "hello" } }, "/blog/launch", "/elsewhere/x"];
+    expect(await staticParams(async () => ({ getStaticPaths: async () => ({ paths, fallback: false }) }), "/blog/[slug]")()).toEqual([{ slug: "hello" }, { slug: "launch" }]);
+    const docs = await staticParams(async () => ({ getStaticPaths: () => ({ paths: ["/docs/a/b"] }) }), "/docs/[...path]")();
+    expect(docs).toEqual([{ path: ["a", "b"] }]);
   });
 
   it("takes rows from generateStaticParams, and leaves out a page whose generateStaticParams fails", async () => {
