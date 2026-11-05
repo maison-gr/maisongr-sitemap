@@ -32,6 +32,14 @@ export type Locales = {
   segment?: string;
   /** Every route is served under /{language}/ by middleware, with no [locale] folder in the routes. */
   prefix?: boolean;
+  /** The default language has a prefix too ("/en/about"). Set false when it is served at "/about". Default true. */
+  prefixDefault?: boolean;
+  /**
+   * Each language version is its own page file, in a folder named for it
+   * (Astro's src/pages/fr/about.astro): pages with the same path once the
+   * language is taken off are versions of one page.
+   */
+  folders?: boolean;
 };
 
 /** With prefix routing, "/pricing" is really "/[locale]/pricing". */
@@ -98,6 +106,8 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     return `${site}${options.trailingSlash && full !== "/" ? `${full}/` : full}`;
   };
   const out: Entry[] = [];
+  /** Entries of routes with no language segment, by path, for languages kept in folders. */
+  const plain: { path: string; entry: Entry }[] = [];
 
   for (const route of routes) {
     const pattern = withPrefix(route.pattern, options.locales);
@@ -111,7 +121,10 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     if (!seg || !options.locales) {
       for (const row of rows) {
         const path = fill(pattern, row);
-        if (path && !matches(path, options.exclude ?? [])) out.push({ loc: url(path), lastmod: dateOf(row.lastmod) ?? route.lastmod });
+        if (!path || matches(path, options.exclude ?? [])) continue;
+        const entry: Entry = { loc: url(path), lastmod: dateOf(row.lastmod) ?? route.lastmod };
+        out.push(entry);
+        plain.push({ path, entry });
       }
       continue;
     }
@@ -130,7 +143,8 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
       groups.set(tail, group);
     }
     for (const [tail, versions] of groups) {
-      const pathOf = (locale: string) => `/${locale}${tail === "/" ? "" : tail}`;
+      const pathOf = (locale: string) =>
+        locale === fallback && options.locales!.prefixDefault === false ? tail : `/${locale}${tail === "/" ? "" : tail}`;
       const present = versions.map((v) => v.locale);
       const alternates = [
         ...present.map((l) => ({ hreflang: l, href: url(pathOf(l)) })),
@@ -144,7 +158,36 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     }
   }
 
+  if (options.locales?.folders) linkFolders(plain, options.locales, url);
+
   // Each address once, whatever produced it.
   const seen = new Set<string>();
   return out.filter((e) => (seen.has(e.loc) ? false : (seen.add(e.loc), true)));
+}
+
+/**
+ * Languages kept in folders: "/fr/about" is the French "/about" (or
+ * "/en/about", when the default language has a prefix too). Each page gets
+ * its language, and every version of a page names all the others.
+ */
+function linkFolders(plain: { path: string; entry: Entry }[], locales: Locales, url: (path: string) => string) {
+  const versions = new Map<string, { lang: string; path: string; entry: Entry }[]>();
+  for (const { path, entry } of plain) {
+    const first = path.split("/")[1] ?? "";
+    const lang = locales.list.includes(first) ? first : locales.prefixDefault === false ? locales.default : null;
+    if (!lang) continue;
+    const tail = first === lang ? path.slice(lang.length + 1) || "/" : path;
+    versions.set(tail, [...(versions.get(tail) ?? []), { lang, path, entry }]);
+  }
+  for (const group of versions.values()) {
+    const fallback = group.find((v) => v.lang === locales.default);
+    const alternates = [
+      ...group.map((v) => ({ hreflang: v.lang, href: url(v.path) })),
+      ...(fallback ? [{ hreflang: "x-default", href: url(fallback.path) }] : []),
+    ];
+    for (const v of group) {
+      v.entry.lang = v.lang;
+      if (group.length > 1) v.entry.alternates = alternates;
+    }
+  }
 }

@@ -57,7 +57,7 @@ export type Manifest = {
   /** The site serves "/about/" rather than "/about". */
   trailingSlash?: boolean;
   /** Read from the project on every build, so a new language is never missed. */
-  locales?: { list: string[]; default: string; prefix?: boolean };
+  locales?: { list: string[]; default: string; prefix?: boolean; prefixDefault?: boolean; folders?: boolean };
   routes: Route[];
   theme: Theme;
 };

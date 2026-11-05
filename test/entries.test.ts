@@ -95,6 +95,51 @@ describe("expand", () => {
   });
 });
 
+describe("a default language without a prefix", () => {
+  it("serves the default language at the bare path, the others under their prefix", async () => {
+    const out = await expand([{ pattern: "/" }, { pattern: "/about" }], { site, locales: { list: ["en", "fr"], default: "en", prefix: true, prefixDefault: false } });
+    expect(out.map((e) => [e.loc, e.lang])).toEqual([
+      [`${site}/`, "en"],
+      [`${site}/fr`, "fr"],
+      [`${site}/about`, "en"],
+      [`${site}/fr/about`, "fr"],
+    ]);
+    expect(out[3]!.alternates).toEqual([
+      { hreflang: "en", href: `${site}/about` },
+      { hreflang: "fr", href: `${site}/fr/about` },
+      { hreflang: "x-default", href: `${site}/about` },
+    ]);
+  });
+});
+
+describe("languages kept in folders", () => {
+  const locales = { list: ["en", "fr", "es"], default: "en", folders: true, prefixDefault: false };
+
+  it("links the versions of each page, and leaves a page in one language alone", async () => {
+    const routes = [{ pattern: "/" }, { pattern: "/about" }, { pattern: "/fr" }, { pattern: "/fr/about" }, { pattern: "/es/about" }, { pattern: "/legal" }];
+    const out = await expand(routes, { site, locales });
+    const about = out.find((e) => e.loc === `${site}/fr/about`)!;
+    expect(about.lang).toBe("fr");
+    expect(about.alternates).toEqual([
+      { hreflang: "en", href: `${site}/about` },
+      { hreflang: "fr", href: `${site}/fr/about` },
+      { hreflang: "es", href: `${site}/es/about` },
+      { hreflang: "x-default", href: `${site}/about` },
+    ]);
+    expect(out.find((e) => e.loc === `${site}/fr`)!.alternates?.map((a) => a.href)).toEqual([`${site}/`, `${site}/fr`, `${site}/`]);
+    expect(out.find((e) => e.loc === `${site}/legal`)).toEqual({ loc: `${site}/legal`, lastmod: undefined, lang: "en" });
+  });
+
+  it("with a prefix on every language, leaves pages outside the language folders unlabelled", async () => {
+    const out = await expand([{ pattern: "/en/about" }, { pattern: "/fr/about" }, { pattern: "/press-kit" }], { site, locales: { ...locales, prefixDefault: true } });
+    expect(out.map((e) => [e.loc, e.lang, e.alternates?.length])).toEqual([
+      [`${site}/en/about`, "en", 3],
+      [`${site}/fr/about`, "fr", 3],
+      [`${site}/press-kit`, undefined, undefined],
+    ]);
+  });
+});
+
 describe("basePath", () => {
   it("mounts every address under it, the home page without a slash that would redirect", async () => {
     const routes = [{ pattern: "/" }, { pattern: "/a" }, { pattern: "/drafts" }];
