@@ -210,7 +210,7 @@ h2{min-width:0;overflow-wrap:anywhere;font:600 clamp(1.5rem,3.5vw,2.25rem)/1.1 v
 .url{display:block;min-width:0;min-height:44px;padding:.625rem 0;overflow-wrap:anywhere;text-decoration:none;font-size:.9375rem;line-height:1.5;text-underline-offset:.25em}
 .url:hover{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px}
 .lang{font:500 .6875rem/1 var(--mono);letter-spacing:.06em;padding:.25rem .5rem;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
-.empty{margin-top:3rem;text-align:center;color:var(--muted)}
+.empty{margin-top:clamp(2rem,5vw,3rem);max-width:44ch;color:var(--muted)}
 .foot{margin-top:4rem;padding-top:1.25rem;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem 1.5rem;font:400 .75rem/1.5 var(--mono);color:var(--muted)}
 .foot a{color:var(--fg)}
 @media (max-width:40rem){.row{grid-template-columns:2.5rem minmax(0,1fr) auto}.date{display:none}}
