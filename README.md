@@ -29,7 +29,7 @@ npx @maison-gr/sitemap init
    - colour tokens: shadcn, Tailwind v4 `@theme`, or plain CSS variables, light and dark;
    - your `next/font` fonts, served from your own domain under `/_sitemap/`;
    - your site name and icon.
-6. **Writes** `app/sitemap.xml/route.ts` and `manifest.json`, and adds `maisongr-sitemap build` to `prebuild` so every build re-reads all of it.
+6. **Writes** `app/sitemap.xml/route.ts` and `manifest.json`, and puts `maisongr-sitemap build` at the start of your `build` script, so every build re-reads all of it. It goes in `build` itself, not `prebuild`, because pnpm and Yarn 2+ never run `prebuild`.
 
 Then install it: `npm install @maison-gr/sitemap`.
 

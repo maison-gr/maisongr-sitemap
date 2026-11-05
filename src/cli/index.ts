@@ -3,9 +3,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { detect, readPackage } from "../build/detect.js";
 import { buildNext, manifestPathOf, type BuildReport } from "../build/next-build.js";
+import { COMMAND, withBuildStep } from "../build/scripts.js";
 import { buildStatic } from "../build/static.js";
-
-const COMMAND = "maisongr-sitemap build";
 const HELP = `@maison-gr/sitemap
 
   maisongr-sitemap init              Detect the framework and set the sitemap up
@@ -62,17 +61,15 @@ function printReport(r: BuildReport) {
   }
 }
 
-/** Runs the build step before the site's own build, without replacing a prebuild it already has. */
-function addPrebuild(): string {
+/** Runs the build step before the site's own build, keeping the package.json's indentation. */
+function addBuildStep(): string {
   const file = join(root, "package.json");
   const pkg = readPackage(root) ?? fail("No package.json here.");
-  pkg.scripts ??= {};
-  const current: string | undefined = pkg.scripts.prebuild;
-  if (current?.includes(COMMAND)) return "already runs before each build";
-  pkg.scripts.prebuild = current ? `${COMMAND} && ${current}` : COMMAND;
-  const indent = readFileSync(file, "utf8").match(/^\{\n([ \t]+)/)?.[1] ?? "  ";
+  const { scripts, note } = withBuildStep(pkg.scripts);
+  pkg.scripts = scripts;
+  const indent = readFileSync(file, "utf8").match(/^\{\r?\n([ \t]+)/)?.[1] ?? "  ";
   writeFileSync(file, JSON.stringify(pkg, null, indent) + "\n");
-  return `added to "prebuild" in package.json`;
+  return note;
 }
 
 async function init() {
@@ -112,7 +109,7 @@ async function init() {
   say(`\n  Wrote  ${rel(route)}`);
   say(`  Wrote  ${rel(report.manifestPath)}  (commit it: shallow CI clones keep its dates)`);
   if (report.theme.fonts.length) say(`  Wrote  public/_sitemap/  (the page's fonts, served from your own domain)`);
-  say(`  Build  ${addPrebuild()}`);
+  say(`  Build  ${addBuildStep()}`);
 
   const deps = { ...readPackage(root)?.dependencies };
   if (!deps["@maison-gr/sitemap"]) say(`\n  Next:  npm install @maison-gr/sitemap`);
