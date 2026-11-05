@@ -11,6 +11,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 ### Changed
 
 - The page's footer says when the newest page last changed (« Mis à jour le 5 novembre 2026 »), and the credit names the tool it was made with and links to its source: "Made with maisongr-sitemap, open source, by Maison GR". `credit: false` and `--no-credit` still leave it out.
+- The XML file, as a browser shows it on a static host, is set in the site's fonts and colours, light and dark, with a heading, and says what it is. In static mode it names the page for people: « La page à lire est à l’adresse /sitemap/ ». It was a bare list in the system font.
 
 ### Fixed
 

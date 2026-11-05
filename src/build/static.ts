@@ -212,7 +212,7 @@ export const htmlLang = (html: string) => attr(html.match(/<html\b[^>]*>/i)?.[0]
 export function sitemapFiles(entries: Entry[], theme: Theme, page: { credit?: boolean; lang?: string } = {}): [string, string][] {
   return [
     ["sitemap.xml", urlsetXml(entries, "/sitemap.css")],
-    ["sitemap.css", xmlCss(theme)],
+    ["sitemap.css", xmlCss(theme, { lang: page.lang, page: "/sitemap/" })],
     ["sitemap/index.html", urlsetPage(entries, theme, { ...page, assets: { css: "/sitemap/page.css", js: "/sitemap/page.js" } })],
     ["sitemap/page.css", pageCss(theme)],
     ["sitemap/page.js", PAGE_JS],

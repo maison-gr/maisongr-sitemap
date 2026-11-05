@@ -24,6 +24,10 @@ export type Strings = {
   footer: string;
   /** The credit, around the tool's and the studio's links. */
   credit: (tool: string, studio: string) => string;
+  /** The XML file's own view in a browser: its eyebrow, what it is, and where the page for people is. */
+  xmlEyebrow: string;
+  xmlNote: string;
+  xmlPage: (path: string) => string;
   /** For the filter's live count: {shown} and {total} are filled in by the page's script. */
   tally: string;
 };
@@ -48,6 +52,9 @@ const en: Strings = {
   footer: "Search engines read the same list as XML.",
   credit: (tool, studio) => `Made with ${tool}, open source, by ${studio}`,
   tally: "{shown} of {total} pages",
+  xmlEyebrow: "Sitemap · XML",
+  xmlNote: "This is the file search engines read.",
+  xmlPage: (path) => `The page for people is at ${path}`,
 };
 
 const fr: Strings = {
@@ -73,6 +80,9 @@ const fr: Strings = {
   footer: "Les moteurs de recherche lisent la même liste en XML.",
   credit: (tool, studio) => `Réalisé avec ${tool}, outil open source de ${studio}`,
   tally: "{shown} sur {total} pages",
+  xmlEyebrow: "Plan du site · XML",
+  xmlNote: "Ce fichier est celui que lisent les moteurs de recherche.",
+  xmlPage: (path) => `La page à lire est à l’adresse ${path}`,
 };
 
 const LANGUAGES: Record<string, Strings> = { en, fr };

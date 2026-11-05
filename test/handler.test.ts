@@ -1,4 +1,8 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildStatic } from "../src/build/static.js";
 import { createSitemap } from "../src/handler.js";
 import type { Manifest } from "../src/types.js";
 
@@ -317,6 +321,32 @@ describe("the page's footer", () => {
     expect(html).toContain('Made with <a href="https://github.com/maison-gr/sitemap" rel="noopener">maisongr-sitemap</a>, open source, by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a>');
     expect(urlsetPage([e("/")], manifest.theme, { lang: "fr" })).toContain("maisongr-sitemap</a>, outil open source de <a");
     expect(urlsetPage([e("/")], manifest.theme, { credit: false })).not.toContain('class="credit"');
+  });
+});
+
+describe("the XML as a browser shows it", () => {
+  it("is set in the site's type, says what the file is, and names the page for people when there is one", async () => {
+    const { xmlCss } = await import("../src/page.js");
+    const css = xmlCss({ ...manifest.theme, fonts: [{ family: "Inter", role: "body", files: [{ url: "/fonts/inter.woff2" }] }] }, { lang: "fr", page: "/sitemap/" });
+    expect(css).toContain('@font-face{font-family:"Inter";src:url("/fonts/inter.woff2")');
+    expect(css).toContain('content:"Plan du site · XML"');
+    expect(css).toContain('content:"Toutes les pages d’Example & Co."');
+    expect(css).toContain("La page à lire est à l’adresse /sitemap/");
+    // A server answers browsers with the page itself, so there is no other address to name.
+    expect(xmlCss(manifest.theme)).toContain('content:"This is the file search engines read."');
+  });
+
+  it("keeps a name with quotes or backslashes inside its CSS string", async () => {
+    const { xmlCss } = await import("../src/page.js");
+    expect(xmlCss({ ...manifest.theme, name: 'The "Q" \\ Co' })).toContain('content:"Every page on The \\"Q\\" \\\\ Co."');
+  });
+
+  it("is what static mode writes beside the XML", () => {
+    const root = mkdtempSync(join(tmpdir(), "mgr-xmlcss-"));
+    writeFileSync(join(root, "index.html"), '<html lang="fr"><head><title>Puits</title></head><body></body></html>');
+    buildStatic(root, "https://puits.example");
+    expect(readFileSync(join(root, "sitemap.css"), "utf8")).toContain("La page à lire est à l’adresse /sitemap/");
+    rmSync(root, { recursive: true, force: true });
   });
 });
 

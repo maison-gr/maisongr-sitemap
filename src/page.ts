@@ -160,12 +160,37 @@ ${rows}
   return shell(theme, t.indexTitle, body, options, newestDate(parts.map((p) => p.lastmod)));
 }
 
-/** The XML styled with CSS, for browsers that open the sitemap without sending Sec-Fetch-Dest. */
-export const xmlCss = (theme: Theme) => `urlset,sitemapindex{display:block;max-width:68rem;margin:0 auto;padding:3rem 1rem;background:${theme.light.background};color:${theme.light.foreground};font:15px/1.6 ui-sans-serif,system-ui,sans-serif}
-url,sitemap{display:block;padding:.5rem 0;border-bottom:1px solid ${theme.light.border}}
-loc{display:block;overflow-wrap:anywhere}
-lastmod{display:block;font:12px ui-monospace,monospace;color:${theme.light.muted}}
-link{display:none}`;
+/** A CSS string literal: quotes and backslashes escaped, a newline as \A. */
+const cssText = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\A ")}"`;
+
+/**
+ * The XML as a browser shows it when it can't be told apart from a crawler:
+ * a static host, or a browser without Sec-Fetch-Dest. CSS can't add links, so
+ * it sets the file in the site's type and colours, says what the file is, and
+ * names the page for people when there is one (static mode's /sitemap/).
+ */
+export function xmlCss(theme: Theme, options: { lang?: string; page?: string } = {}): string {
+  const t = stringsFor(options.lang);
+  const root = "urlset,sitemapindex";
+  const dark = theme.dark ? `@media (prefers-color-scheme:dark){:root{${vars(theme.dark)}color-scheme:dark}}` : "";
+  return `${fontFaces(theme)}
+:root{${vars(theme.light)}color-scheme:light;background:var(--bg)}
+${dark}
+${root}{display:block;max-width:68rem;margin:0 auto;padding:clamp(2rem,6vw,4.5rem) clamp(1rem,4vw,2.5rem) 4rem;color:var(--fg);font:16px/1.6 ${family(theme.fonts, "body")};-webkit-font-smoothing:antialiased}
+${root.split(",").map((r) => `${r}::before`).join(",")}{content:${cssText(t.xmlEyebrow)};display:block;margin-bottom:1rem;font:500 .75rem/1.4 ${family(theme.fonts, "mono")};letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+url:first-of-type,sitemap:first-of-type{padding-top:0}
+url:first-of-type::before,sitemap:first-of-type::before{content:${cssText(`${t.heading(theme.name)}.`)};display:block;margin-bottom:clamp(2rem,5vw,3.5rem);padding-bottom:1.25rem;border-bottom:1px solid var(--fg);font:600 clamp(2.25rem,7vw,4.5rem)/1.02 ${family(theme.fonts, "display")};letter-spacing:-.035em;text-wrap:balance}
+${root.split(",").map((r) => `${r}::after`).join(",")}{content:${cssText(options.page ? `${t.xmlNote} ${t.xmlPage(options.page)}` : t.xmlNote)};display:block;margin-top:2.5rem;font:400 .75rem/1.6 ${family(theme.fonts, "mono")};color:var(--muted)}
+url,sitemap{display:block;padding:.85rem 0;border-bottom:1px solid var(--border)}
+loc{display:block;overflow-wrap:anywhere;font-size:1.0625rem;letter-spacing:-.005em}
+lastmod{display:block;margin-top:.15rem;font:400 .75rem/1.5 ${family(theme.fonts, "mono")};color:var(--muted)}
+url>:not(loc):not(lastmod),sitemap>:not(loc):not(lastmod){display:none}`;
+}
+
+const fontFaces = (theme: Theme) =>
+  theme.fonts
+    .flatMap((f) => f.files.map((file) => `@font-face{font-family:"${f.family}";src:url("${file.url}") format("woff2");font-weight:${file.weight ?? "100 900"};font-style:${file.style ?? "normal"};font-display:swap}`))
+    .join("\n");
 
 const vars = (p: Palette) =>
   `--bg:${p.background};--fg:${p.foreground};--muted:${p.muted};--border:${p.border};--accent:${p.accent};--surface:${p.surface};`;
@@ -179,9 +204,7 @@ function family(fonts: Font[], role: Font["role"]): string {
 }
 
 export function pageCss(theme: Theme): string {
-  const faces = theme.fonts
-    .flatMap((f) => f.files.map((file) => `@font-face{font-family:"${f.family}";src:url("${file.url}") format("woff2");font-weight:${file.weight ?? "100 900"};font-style:${file.style ?? "normal"};font-display:swap}`))
-    .join("\n");
+  const faces = fontFaces(theme);
   const dark = theme.dark
     ? `@media (prefers-color-scheme:dark){:root{${vars(theme.dark)}color-scheme:dark}}`
     : "";

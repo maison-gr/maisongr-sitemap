@@ -183,7 +183,7 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
     const asset = url.searchParams.get("asset");
     if (asset === "page.css") return respond(pageCss(theme), "text/css", { "Cache-Control": "public, max-age=86400" });
     if (asset === "page.js") return respond(PAGE_JS, "text/javascript", { "Cache-Control": "public, max-age=86400" });
-    if (asset === "xml.css") return respond(xmlCss(theme), "text/css", { "Cache-Control": "public, max-age=86400" });
+    if (asset === "xml.css") return respond(xmlCss(theme, { lang: page.lang }), "text/css", { "Cache-Control": "public, max-age=86400" });
 
     const site = trimSlashes(options.site ?? manifest.site ?? url.origin);
     let groups: Map<string, Entry[]>;
