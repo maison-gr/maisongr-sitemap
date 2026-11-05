@@ -27,7 +27,7 @@ npx @maison-gr/sitemap init
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
 | **Any static site**, from any generator | [`static`](#static-sites) on the build output |
 
-Each one has been checked on a real production build: Next.js 15 and 16 (with `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4 and React Router 8.
+Each one has been checked on a real production build: Next.js 15 and 16 (with `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4 and React Router 8. The handler also runs on Bun 1.4 and Deno 2.9.
 
 ## What `init` does
 
