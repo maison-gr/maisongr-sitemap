@@ -5,7 +5,7 @@ import type { Palette } from "../types.js";
 const NAMES: Record<keyof Palette, string[]> = {
   background: ["--background", "--color-background", "--bg", "--color-bg", "--page", "--paper", "--stage", "--canvas", "--mist"],
   foreground: ["--foreground", "--color-foreground", "--fg", "--text", "--color-text", "--ink", "--text-primary"],
-  muted: ["--muted-foreground", "--color-muted-foreground", "--text-muted", "--color-text-muted", "--muted-text", "--ink-2", "--dim"],
+  muted: ["--muted-foreground", "--color-muted-foreground", "--text-muted", "--color-text-muted", "--muted-text", "--text-secondary", "--color-text-secondary", "--color-text-2", "--text-2", "--ink-2", "--dim"],
   border: ["--border", "--color-border", "--rule", "--hair", "--line", "--divider", "--border-color"],
   accent: ["--primary", "--color-primary", "--brand", "--color-brand", "--color-action", "--action", "--signal", "--accent", "--color-accent"],
   surface: ["--card", "--color-card", "--surface", "--color-surface", "--sheet", "--panel"],

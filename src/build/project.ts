@@ -81,7 +81,8 @@ export function findSite(files: string[]): string | undefined {
     const src = read(f);
     const m =
       src.match(/metadataBase\s*:\s*new\s+URL\(\s*["'](https?:\/\/[^"']+)["']/) ??
-      src.match(/\b(?:SITE_URL|SITE_ORIGIN|BASE_URL|siteUrl)\s*(?::[^=]+)?=\s*["'](https?:\/\/[^"']+)["']/);
+      // Also with an environment variable in front: (process.env.SITE_URL || "https://…").
+      src.match(/\b(?:SITE_URL|SITE_ORIGIN|BASE_URL|siteUrl)\s*(?::[^=]+)?=\s*\(?\s*(?:process\.env\.\w+\s*(?:\|\||\?\?)\s*)?["'](https?:\/\/[^"']+)["']/);
     if (m && !/localhost|127\.0\.0\.1|example\.com/.test(m[1]!)) return trimSlashes(m[1]!);
   }
   return undefined;
