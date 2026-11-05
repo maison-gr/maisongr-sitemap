@@ -5,6 +5,8 @@ import type { Entry, Font, Theme } from "../types.js";
 import { urlsetXml } from "../xml.js";
 import { blocks, scopes } from "./css.js";
 import { DEFAULT_PALETTE, palette } from "./palette.js";
+import { styleBlocks } from "./project.js";
+import { privateOf } from "./route-rules.js";
 
 export type StaticReport = { pages: number; skipped: { path: string; reason: string }[]; written: string[]; theme: Theme };
 
@@ -58,6 +60,11 @@ export function buildStatic(dir: string, site: string, options: { name?: string;
   for (const file of files.filter((f) => f.endsWith(".html"))) {
     const path = pathOf(file, dir);
     if (/^\/(404|500)(\.html|\/)?$/.test(path) || path.startsWith("/sitemap/")) continue;
+    const privateSegment = privateOf(path.split("/").filter(Boolean));
+    if (privateSegment) {
+      skipped.push({ path, reason: `private page (${privateSegment})` });
+      continue;
+    }
     const html = readFileSync(file, "utf8");
     const robots = [...html.matchAll(/<meta\b[^>]*>/gi)].map((t) => t[0]).find((t) => /name\s*=\s*["']robots["']/i.test(t));
     if (robots && /noindex/i.test(attr(robots, "content") ?? "")) {
@@ -77,12 +84,24 @@ export function buildStatic(dir: string, site: string, options: { name?: string;
   }
   entries.sort((a, b) => a.loc.localeCompare(b.loc));
 
-  const css = files.filter((f) => f.endsWith(".css") && !f.includes(`${sep}sitemap${sep}`)).map((f) => readFileSync(f, "utf8")).join("\n");
+  const home = files.find((f) => relative(dir, f) === "index.html");
+  const homeHtml = home ? readFileSync(home, "utf8") : "";
+  // Stylesheets, then the CSS a build inlined into the home page (Astro and Vite inline small ones).
+  const css = [
+    ...files.filter((f) => f.endsWith(".css") && !f.includes(`${sep}sitemap${sep}`) && relative(dir, f) !== "sitemap.css").map((f) => readFileSync(f, "utf8")),
+    styleBlocks(homeHtml),
+  ].join("\n");
   const { light, dark } = scopes(blocks(css));
-  const title = files.find((f) => f.endsWith(`${sep}index.html`) && relative(dir, f) === "index.html");
-  const name = options.name ?? (title ? readFileSync(title, "utf8").match(/<title>([^<|·—–-]+)/i)?.[1]?.trim() : undefined) ?? new URL(base).hostname;
+  const name = options.name ?? homeHtml.match(/<title>([^<|·—–-]+)/i)?.[1]?.trim() ?? new URL(base).hostname;
   const darkPalette = dark.size ? palette(dark, light) : null;
-  const theme: Theme = { name, light: palette(light) ?? DEFAULT_PALETTE, ...(darkPalette ? { dark: darkPalette } : {}), fonts: siteFonts(css) };
+  const icon = ["favicon.svg", "icon.svg", "favicon.png", "favicon.ico"].find((n) => files.some((f) => relative(dir, f) === n));
+  const theme: Theme = {
+    name,
+    light: palette(light) ?? DEFAULT_PALETTE,
+    ...(darkPalette ? { dark: darkPalette } : {}),
+    fonts: siteFonts(css),
+    ...(icon ? { icon: `/${icon}` } : {}),
+  };
 
   mkdirSync(join(dir, "sitemap"), { recursive: true });
   const written = [

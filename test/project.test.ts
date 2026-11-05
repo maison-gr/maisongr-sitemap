@@ -235,4 +235,23 @@ describe("static sites", () => {
     expect(page).toContain("Every page on Atelier");
     expect(readFileSync(join(root, "out/sitemap/page.css"), "utf8")).toContain('font-family:"Brand"');
   });
+
+  it("leaves out private pages, and reads the tokens and icon a build inlined into the home page", () => {
+    const root = project({
+      "dist/index.html": "<html><head><title>Atelier</title><style>:root{--background:#f6f3ee;--foreground:#16130f}</style></head></html>",
+      "dist/about/index.html": "<html></html>",
+      "dist/login/index.html": "<html></html>",
+      "dist/favicon.svg": "<svg/>",
+    });
+    const report = buildStatic(join(root, "dist"), "https://atelier.dev");
+    expect(report.pages).toBe(2);
+    expect(report.skipped).toEqual([{ path: "/login/", reason: "private page (login)" }]);
+    expect(report.theme).toMatchObject({ name: "Atelier", icon: "/favicon.svg", light: { background: "#f6f3ee", foreground: "#16130f" } });
+  });
+
+  it("does not read its own sitemap.css back as the site's theme on the next build", () => {
+    const root = project({ "dist/index.html": "<html><style>:root{--background:#fff;--foreground:#111}</style></html>" });
+    buildStatic(join(root, "dist"), "https://atelier.dev");
+    expect(buildStatic(join(root, "dist"), "https://atelier.dev").theme.light.background).toBe("#fff");
+  });
 });
