@@ -34,7 +34,7 @@ Each one has been checked on a real production build: Next.js 15 and 16 (with `c
 1. **Detects** the framework, and whether the site runs a server or builds static files.
 2. **Finds the pages** from your route files, following each framework's rules: route groups, private folders, optional and rest parameters, matchers, ignored files. It leaves out:
    - pages marked `noindex`: in metadata, in a robots meta tag, through a layout prop such as `<Layout noindex />`, or through a helper such as `privatePageMetadata()`;
-   - sign-in, account, admin, checkout and developer pages.
+   - sign-in, account, admin, checkout and developer pages, wherever the word appears in the name (`account-recovery`, `confirm-email-change`), but not inside another word (`accounting` stays). Pass `exclude` for anything else that's private.
 
    Every page it leaves out is listed, with the reason.
 3. **Finds your languages**. Each language version is its own entry, with `hreflang` alternates and `x-default`. It reads:
