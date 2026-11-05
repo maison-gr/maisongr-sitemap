@@ -4,6 +4,16 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Added
+
+- The page people see speaks French for a French site: « Plan du site », « Toutes les pages de… », the filter and its live count, the footer, and `<html lang>`. It follows the site's default language; `lang` sets it, and `--lang` in static mode and `crawl`, which otherwise take the home page's `<html lang>`.
+- `connect`: robots.txt naming the sitemap (created, or the line added, after asking; `--yes` in CI), and the files Google Search Console (`--google`), Bing Webmaster Tools (`--bing`) and IndexNow (`--indexnow`) check to verify the site. A file with other content is never replaced; a robots.txt written by code, or naming another sitemap, gets advice instead of an edit.
+- `llms`: llms.txt for AI assistants, from the sitemap, one version of each page, in each page's own title and description. Reads a running copy with `--from`; never replaces one written by hand.
+
+### Fixed
+
+- A page that is noindex only for some content (`shouldIndex ? { index: true } : { index: false }`) is listed, not left out as always noindex.
+
 ## [1.2.0] - 2026-11-05
 
 Every kind of site, tested on real projects: a Vite app, a Pages Router project, Eleventy, a hand-written HTML site and a server that renders each page on request.
