@@ -161,7 +161,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     }
   }
 
-  if (options.locales?.folders) linkFolders(plain, options.locales, url);
+  if (options.locales?.folders) linkFolders(plain, options.locales);
 
   // Each address once, whatever produced it.
   const seen = new Set<string>();
@@ -173,22 +173,22 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
  * "/en/about", when the default language has a prefix too). Each page gets
  * its language, and every version of a page names all the others.
  */
-function linkFolders(plain: { path: string; entry: Entry }[], locales: Locales, url: (path: string) => string) {
-  const versions = new Map<string, { lang: string; path: string; entry: Entry }[]>();
+export function linkFolders(plain: { path: string; entry: Entry }[], locales: Locales) {
+  const versions = new Map<string, { lang: string; entry: Entry }[]>();
   for (const { path, entry } of plain) {
     const first = path.split("/")[1] ?? "";
     const lang = locales.list.includes(first) ? first : locales.prefixDefault === false ? locales.default : null;
     if (!lang) continue;
     const tail = first === lang ? path.slice(lang.length + 1) || "/" : path;
-    versions.set(tail, [...(versions.get(tail) ?? []), { lang, path, entry }]);
+    versions.set(tail, [...(versions.get(tail) ?? []), { lang, entry }]);
   }
   for (const group of versions.values()) {
     // In the site's own order of languages, as the [locale] routes list them.
     group.sort((a, b) => locales.list.indexOf(a.lang) - locales.list.indexOf(b.lang));
     const fallback = group.find((v) => v.lang === locales.default);
     const alternates = [
-      ...group.map((v) => ({ hreflang: v.lang, href: url(v.path) })),
-      ...(fallback ? [{ hreflang: "x-default", href: url(fallback.path) }] : []),
+      ...group.map((v) => ({ hreflang: v.lang, href: v.entry.loc })),
+      ...(fallback ? [{ hreflang: "x-default", href: fallback.entry.loc }] : []),
     ];
     for (const v of group) {
       v.entry.lang = v.lang;

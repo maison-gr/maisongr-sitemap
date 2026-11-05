@@ -1,4 +1,4 @@
-import { dateOf, expand, matches, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
+import { dateOf, expand, linkFolders, matches, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
 import { DEFAULT_PALETTE } from "./build/palette.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
@@ -82,6 +82,13 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
   const page = { credit: options.credit, home: basePath || "/" };
   let cache: { at: number; site: string; entries: Promise<Entry[]> } | undefined;
 
+  /** An address's path as routes and `exclude` write it: without the basePath. */
+  const ownPath = (loc: string) => {
+    const path = new URL(loc).pathname;
+    const under = basePath && (path === basePath || path.startsWith(`${basePath}/`));
+    return under ? path.slice(basePath.length) || "/" : path;
+  };
+
   const load = (site: string) => {
     if (!cache || cache.site !== site || Date.now() - cache.at > ttl) {
       const entries = (async () => {
@@ -94,15 +101,15 @@ export function createSitemap(options: SitemapOptions = {}): (request: Request) 
             const day = dateOf(lastmod);
             return day ? { ...e, loc, lastmod: day } : { ...e, loc };
           })
-          .filter((e) => {
-            // exclude is written without the basePath, as for routes.
-            const path = new URL(e.loc).pathname;
-            const under = basePath && (path === basePath || path.startsWith(`${basePath}/`));
-            return !matches(under ? path.slice(basePath.length) || "/" : path, options.exclude ?? []);
-          });
+          .filter((e) => !matches(ownPath(e.loc), options.exclude ?? []));
         // Each address once, whatever produced it.
         const seen = new Set(fromRoutes.map((e) => e.loc));
-        return [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc) && !!seen.add(e.loc))];
+        const all = [...fromRoutes, ...extra.filter((e) => !seen.has(e.loc) && !!seen.add(e.loc))];
+        // Languages in folders: an address from `entries` is a version of the same page as a route's.
+        if (locales?.folders && extra.length) {
+          linkFolders(all.filter((e) => e.loc.startsWith(`${site}/`) || e.loc === site).map((entry) => ({ path: ownPath(entry.loc), entry })), locales);
+        }
+        return all;
       })();
       cache = { at: Date.now(), site, entries };
       // A failed load is not kept: the next request tries again.

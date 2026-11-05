@@ -157,6 +157,18 @@ describe("createSitemap", () => {
     expect(locs(await (await get(extra)).text())).toEqual(["https://www.example.com/docs/a", "https://www.example.com/docsearch"]);
   });
 
+  it("links entries kept in language folders with each other and with the routes", async () => {
+    const folders = createSitemap({
+      manifest: { ...manifest, routes: [{ pattern: "/about" }], locales: { list: ["en", "fr"], default: "en", folders: true, prefixDefault: false } },
+      entries: () => [{ loc: "/fr/about" }, { loc: "https://elsewhere.dev/fr/about" }],
+    });
+    const xml = await (await get(folders)).text();
+    expect(xml).toContain(
+      '<loc>https://www.example.com/fr/about</loc>\n    <xhtml:link rel="alternate" hreflang="en" href="https://www.example.com/about"/>\n    <xhtml:link rel="alternate" hreflang="fr" href="https://www.example.com/fr/about"/>',
+    );
+    expect(xml).toContain("<loc>https://elsewhere.dev/fr/about</loc>\n  </url>");
+  });
+
   it("becomes an index of parts past 50,000 addresses", async () => {
     const many = Array.from({ length: 50_001 }, (_, i) => ({ loc: `https://www.example.com/p/${i}` }));
     const big = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => many });
