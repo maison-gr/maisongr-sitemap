@@ -48,10 +48,11 @@ describe("expand", () => {
   });
 
   it("treats a segment that mixes text and parameters as dynamic", async () => {
-    const routes = [{ pattern: "/docs/[lang]-[version]" }];
+    const routes = [{ pattern: "/notes/v[version]" }, { pattern: "/[lang]-docs" }];
     expect(await expand(routes, { site })).toEqual([]);
-    const out = await expand(routes, { site, params: { "/docs/[lang]-[version]": () => [{ lang: "en", version: "v2" }] } });
-    expect(out.map((e) => e.loc)).toEqual([`${site}/docs/en-v2`]);
+    expect(unfilled(routes, {})).toEqual(["/notes/v[version]", "/[lang]-docs"]); // named in the build report, not dropped without a word
+    const out = await expand(routes, { site, params: { "/notes/v[version]": () => [{ version: "2" }], "/[lang]-docs": () => [{ lang: "en" }] } });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/notes/v2`, `${site}/en-docs`]);
   });
 
   it("lets an optional catch-all be empty", async () => {
