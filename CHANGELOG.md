@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-05
+
 ### Changed
 
 - `maisongr-sitemap/vite` answers `/sitemap`, `/sitemap/` and `/sitemap/index.html` with a redirect to `/sitemap.xml`, so the sitemap has one address in dev, as with the host rules. The README's Cloudflare and Vercel rules add the same redirect.
@@ -142,6 +144,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.5.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.5.1
 [1.5.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.5.0
 [1.4.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.1
 [1.4.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.0
