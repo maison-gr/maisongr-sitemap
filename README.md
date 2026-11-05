@@ -125,6 +125,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` wi
 | `revalidate` | Seconds the list is kept before `params` and `entries` run again. Default 3600. A failed load is not kept. To list new content at once, call the handler's `invalidate()` when it is published. |
 | `theme` | Override any detected colour, font, name or icon. |
 | `credit` | The "Sitemap by Maison GR" footer line. Default `true`. |
+| `lang` | The language of the page people see: `"en"` or `"fr"`. Default the site's own default language, so a French-first site gets « Plan du site ». Any other language gets English. Static mode and `crawl` take the home page's `<html lang>`, or `--lang`. |
 
 A `lastmod` can be a `YYYY-MM-DD` string, an ISO timestamp, a `Date` or milliseconds. One that isn't a real date is left out, because an invalid date makes Search Console reject the whole file.
 

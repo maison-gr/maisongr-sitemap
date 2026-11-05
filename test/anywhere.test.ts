@@ -214,3 +214,14 @@ describe("crawl", () => {
     expect(allowed("/private/press/kit")).toBe(true);
   });
 });
+
+describe("the page's language in static mode", () => {
+  it("takes the home page's <html lang>, and --lang over it", () => {
+    const page = (title: string) => `<!doctype html><html lang="fr-CA"><head><title>${title} | Levain</title></head><body></body></html>`;
+    const root = project({ "index.html": page("Accueil"), "a-propos.html": page("À propos") });
+    buildStatic(root, "https://levain.example");
+    expect(readFileSync(join(root, "sitemap/index.html"), "utf8")).toContain("<h1>Toutes les pages de Levain");
+    buildStatic(root, "https://levain.example", { lang: "en" });
+    expect(readFileSync(join(root, "sitemap/index.html"), "utf8")).toContain("<h1>Every page on Levain");
+  });
+});

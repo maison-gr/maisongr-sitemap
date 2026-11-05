@@ -2,7 +2,7 @@ import { trimSlashes } from "../entries.js";
 import type { Entry, Theme } from "../types.js";
 import { styleBlocks } from "./project.js";
 import { privateOf } from "./route-rules.js";
-import { attr, holds, pageFacts, themeOf } from "./static.js";
+import { attr, holds, htmlLang, pageFacts, themeOf } from "./static.js";
 
 /**
  * For a site no file describes (PHP, Python, Ruby, Go, a CMS…): reads it the
@@ -23,7 +23,7 @@ export type CrawlOptions = {
   onPage?: (listed: number, seen: number) => void;
 };
 
-export type CrawlReport = { entries: Entry[]; skipped: { path: string; reason: string }[]; theme: Theme; capped: boolean; queries: number };
+export type CrawlReport = { entries: Entry[]; skipped: { path: string; reason: string }[]; theme: Theme; capped: boolean; queries: number; lang?: string };
 
 const NOT_PAGES = /\.(?:pdf|jpe?g|png|gif|webp|avif|svg|ico|bmp|css|js|mjs|json|xml|txt|csv|zip|gz|rar|7z|mp4|webm|mov|mp3|wav|ogg|woff2?|ttf|otf|eot|map|docx?|xlsx?|pptx?)$/i;
 const AGENT = "maisongr-sitemap (+https://github.com/maison-gr/sitemap)";
@@ -216,5 +216,5 @@ export async function crawl(start: string, options: CrawlOptions = {}): Promise<
 
   entries.sort((a, b) => a.loc.localeCompare(b.loc));
   skipped.sort((a, b) => a.path.localeCompare(b.path));
-  return { entries, skipped, theme: themeOf({ css: css.join("\n"), pages, home, icon, base }), capped, queries: queries.size };
+  return { entries, skipped, theme: themeOf({ css: css.join("\n"), pages, home, icon, base }), capped, queries: queries.size, lang: htmlLang(home) };
 }

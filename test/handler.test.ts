@@ -291,3 +291,24 @@ describe("createSitemap", () => {
     expect(() => createSitemap({ manifest: {} })).toThrow(/maisongr-sitemap build/);
   });
 });
+
+describe("the page's language", () => {
+  const french = { ...manifest, locales: { list: ["fr", "en"], default: "fr" } };
+
+  it("speaks the site's own default language", async () => {
+    const html = await (await get(createSitemap({ manifest: french }), "/sitemap.xml", true)).text();
+    expect(html).toContain('<html lang="fr">');
+    expect(html).toContain("<title>Plan du site · Example &amp; Co</title>");
+    expect(html).toContain("<h1>Toutes les pages d’Example &amp; Co");
+    expect(html).toContain('placeholder="Filtrer par adresse"');
+    expect(html).toContain('data-t="{shown} sur {total} pages"');
+    expect(html).toContain("Les moteurs de recherche lisent la version XML de cette liste.");
+    expect(html).not.toMatch(/Every page|Filter by path|Search engines read/);
+  });
+
+  it("follows lang over the default, and falls back to English for a language it lacks", async () => {
+    expect(await (await get(createSitemap({ manifest: french, lang: "en" }), "/sitemap.xml", true)).text()).toContain("<h1>Every page on");
+    expect(await (await get(createSitemap({ manifest, lang: "fr-CA" }), "/sitemap.xml", true)).text()).toContain("<h1>Toutes les pages d’Example");
+    expect(await (await get(createSitemap({ manifest, lang: "ja" }), "/sitemap.xml", true)).text()).toContain('<html lang="en">');
+  });
+});

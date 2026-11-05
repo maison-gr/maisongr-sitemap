@@ -41,6 +41,8 @@ export type SitemapOptions = {
   theme?: Partial<Omit<Theme, "light" | "dark">> & { light?: Partial<Palette>; dark?: Partial<Palette> };
   /** The "Sitemap by Maison GR" footer line. Default true. */
   credit?: boolean;
+  /** The language of the page people see: "en" or "fr". Default the site's own default language, else English. */
+  lang?: string;
 };
 
 /** An address given through `entries`, its date in any form `DateLike` takes. */
@@ -98,7 +100,7 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
   const ttl = (options.revalidate ?? 3600) * 1000;
   const trailingSlash = options.trailingSlash ?? manifest.trailingSlash;
   const basePath = trimSlashes(options.basePath ?? manifest.basePath ?? "") || undefined;
-  const page = { credit: options.credit, home: basePath || "/" };
+  const page = { credit: options.credit, home: basePath || "/", lang: options.lang ?? manifest.locales?.default };
   let cache: { at: number; site: string; groups: Promise<Map<string, Entry[]>> } | undefined;
   /** The last list that loaded, served when a later load fails: a 5xx on a sitemap costs crawl trust for every address in it. */
   let lastGood: { site: string; groups: Map<string, Entry[]> } | undefined;

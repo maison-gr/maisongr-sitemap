@@ -36,6 +36,7 @@ const HELP = `
   Options
     --site <url>   the address the site is served at     --offline    don't download fonts
     --images       list each page's images               --no-credit  leave out the footer credit
+    --lang <code>  the page's language: en or fr (static, crawl; default the site's)
     --no-color     plain text (also NO_COLOR=1)          --version    --help
 
   Docs: https://github.com/maison-gr/sitemap
@@ -379,7 +380,7 @@ function runStatic() {
   // A single-page app's pages are in its router's table, not in the build output.
   const routes = spaRoutes(root);
   const added = (value("add") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images"), cleanUrls: flag("clean-urls"), extra: [...(routes?.paths ?? []), ...added] });
+  const report = buildStatic(join(root, dir!), site!, { credit: !flag("no-credit"), images: flag("images"), cleanUrls: flag("clean-urls"), lang: value("lang"), extra: [...(routes?.paths ?? []), ...added] });
   u.heading("Found");
   u.ok(`${plural(report.pages, "page")}`, routes ? `${routes.router} routes included` : undefined);
   u.ok(`Theme: ${report.theme.name}`, `${report.theme.dark ? "light and dark" : "light only, as the site"} · fonts: ${report.theme.fonts.map((f) => f.family).join(", ") || "system"}`);
@@ -407,7 +408,7 @@ async function runCrawl() {
   const report = await crawl(start!, { site, max, images: flag("images"), onPage: (listed, seen) => u.progress(`Reading… ${plural(listed, "page")} listed, ${seen} addresses seen`) });
   u.endProgress();
   if (!report.entries.length) fail(`No page could be listed from ${start}.\nIs the site running, and is its home page public? Open it in a browser to check.`);
-  const written = writeSitemapFiles(join(root, out!), report.entries, report.theme, !flag("no-credit"));
+  const written = writeSitemapFiles(join(root, out!), report.entries, report.theme, { credit: !flag("no-credit"), lang: value("lang") ?? report.lang });
   const dated = report.entries.filter((e) => e.lastmod).length;
   u.heading("Found");
   u.ok(plural(report.entries.length, "page"), `${dated} with a date the page states`);

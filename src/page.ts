@@ -1,3 +1,4 @@
+import { stringsFor, type Strings } from "./strings.js";
 import type { Entry, Font, Palette, Theme } from "./types.js";
 
 /*
@@ -19,6 +20,8 @@ export type PageOptions = {
   assets?: { css: string; js: string };
   /** Where the site's name links to. Default "/"; the basePath for a site mounted under one. */
   home?: string;
+  /** The page's own language: its labels, and <html lang>. Default English; "fr" for French. */
+  lang?: string;
 };
 
 const ASSETS = { css: "?asset=page.css", js: "?asset=page.js" };
@@ -54,12 +57,13 @@ function sectionsOf(entries: Entry[]): Map<string, Entry[]> {
   return sections;
 }
 
-const titleOf = (section: string) => (section ? `/${decodeURIComponent(section)}/` : "Pages");
+const titleOf = (section: string, t: Strings) => (section ? `/${decodeURIComponent(section)}/` : t.pagesSection);
 
 function shell(theme: Theme, title: string, body: string, options: PageOptions): string {
   const assets = options.assets ?? ASSETS;
+  const t = stringsFor(options.lang);
   return `<!doctype html>
-<html lang="en">
+<html lang="${esc(t.lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -74,7 +78,7 @@ ${theme.fonts.flatMap((f) => f.files.slice(0, 1)).map((file) => `<link rel="prel
 <main class="page">
 <a class="brand" href="${esc(options.home ?? "/")}">${esc(theme.name)}</a>
 ${body}
-<footer class="foot"><span>Search engines read the XML version of this list.</span>${options.credit !== false ? `<span>Sitemap by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a></span>` : ""}</footer>
+<footer class="foot"><span>${esc(t.footer)}</span>${options.credit !== false ? `<span>${esc(t.credit)} <a href="https://www.maisongr.com" rel="noopener">Maison GR</a></span>` : ""}</footer>
 </main>
 <script src="${esc(assets.js)}" defer></script>
 </body>
@@ -82,6 +86,7 @@ ${body}
 }
 
 export function urlsetPage(entries: Entry[], theme: Theme, options: PageOptions = {}): string {
+  const t = stringsFor(options.lang);
   const langs = [...new Set(entries.map((e) => e.lang).filter((l): l is string => !!l))];
   const width = String(entries.length).length < 2 ? 2 : String(entries.length).length;
 
@@ -99,7 +104,7 @@ export function urlsetPage(entries: Entry[], theme: Theme, options: PageOptions 
 </li>`;
       })
       .join("\n");
-    return `<section class="group" id="${id}" aria-labelledby="${id}-h"><header class="group-head"><h2 id="${id}-h">${esc(titleOf(key))}</h2><span class="count">${rows.length}</span></header>
+    return `<section class="group" id="${id}" aria-labelledby="${id}-h"><header class="group-head"><h2 id="${id}-h">${esc(titleOf(key, t))}</h2><span class="count">${rows.length}</span></header>
 <ol class="rows">
 ${items}
 </ol></section>`;
@@ -107,41 +112,42 @@ ${items}
 
   const counts = langs.map((l) => `<span><b>${entries.filter((e) => e.lang === l).length}</b> ${esc(l.toUpperCase())}</span>`).join("");
   const chips = langs.length > 1
-    ? `<div class="chips" role="group" aria-label="Language"><button type="button" class="chip" data-f="" aria-pressed="true">All</button>${langs.map((l) => `<button type="button" class="chip" data-f="${esc(l)}" aria-pressed="false">${esc(l.toUpperCase())}</button>`).join("")}</div>`
+    ? `<div class="chips" role="group" aria-label="${esc(t.languageGroup)}"><button type="button" class="chip" data-f="" aria-pressed="true">${esc(t.all)}</button>${langs.map((l) => `<button type="button" class="chip" data-f="${esc(l)}" aria-pressed="false">${esc(l.toUpperCase())}</button>`).join("")}</div>`
     : "";
 
-  const heading = `<p class="eyebrow">Sitemap</p>
-<h1>Every page on ${esc(theme.name)}<span class="mark">.</span></h1>`;
+  const heading = `<p class="eyebrow">${esc(t.title)}</p>
+<h1>${esc(t.heading(theme.name))}<span class="mark">.</span></h1>`;
   if (!entries.length) {
-    return shell(theme, "Sitemap", `${heading}\n<p class="empty">No pages are listed yet. They appear here, and in the XML, once the site publishes them.</p>`, options);
+    return shell(theme, t.title, `${heading}\n<p class="empty">${esc(t.empty)}</p>`, options);
   }
 
   const body = `${heading}
-<p class="facts"><span><b>${entries.length}</b> ${entries.length === 1 ? "page" : "pages"}</span>${counts}</p>
+<p class="facts"><span><b>${entries.length}</b> ${esc(t.pages(entries.length))}</span>${counts}</p>
 <div class="tools">
-<input id="q" class="search" type="search" placeholder="Filter by path" aria-label="Filter pages by path" autocomplete="off" spellcheck="false">
+<input id="q" class="search" type="search" placeholder="${esc(t.filterPlaceholder)}" aria-label="${esc(t.filterLabel)}" autocomplete="off" spellcheck="false">
 ${chips}
-<p class="tally" id="tally" aria-live="polite"></p>
+<p class="tally" id="tally" aria-live="polite" data-t="${esc(t.tally)}"></p>
 </div>
-${sections.size > 1 && sections.size <= 12 ? `<nav class="jump" aria-label="Sections">${[...sections].map(([key, rows], i) => `<a href="#s-${i}">${esc(titleOf(key))} <span>${rows.length}</span></a>`).join("")}</nav>` : ""}
+${sections.size > 1 && sections.size <= 12 ? `<nav class="jump" aria-label="${esc(t.sectionsNav)}">${[...sections].map(([key, rows], i) => `<a href="#s-${i}">${esc(titleOf(key, t))} <span>${rows.length}</span></a>`).join("")}</nav>` : ""}
 ${groups.join("\n")}
-<p class="empty" id="empty" hidden>No page matches this filter.</p>`;
+<p class="empty" id="empty" hidden>${esc(t.noMatch)}</p>`;
 
-  return shell(theme, "Sitemap", body, options);
+  return shell(theme, t.title, body, options);
 }
 
 export function indexPage(parts: { loc: string; lastmod?: string; count: number; label?: string }[], theme: Theme, options: PageOptions = {}): string {
+  const t = stringsFor(options.lang);
   const total = parts.reduce((s, p) => s + p.count, 0);
   const rows = parts
     .map((p, i) => `<li class="row"><span class="num">${pad(i + 1, 2)}</span><a class="url" href="${esc(pathOf(p.loc))}">${esc(p.label ?? pathOf(p.loc))}</a><span class="lang">${p.count}</span><span class="date">${p.lastmod ? esc(p.lastmod) : ""}</span></li>`)
     .join("\n");
-  const body = `<p class="eyebrow">Sitemap index</p>
-<h1>Every page on ${esc(theme.name)}<span class="mark">.</span></h1>
-<p class="facts"><span><b>${total}</b> pages</span><span><b>${parts.length}</b> files</span></p>
-<section class="group" aria-labelledby="parts-h"><header class="group-head"><h2 id="parts-h">Files</h2><span class="count">${parts.length}</span></header><ol class="rows">
+  const body = `<p class="eyebrow">${esc(t.indexTitle)}</p>
+<h1>${esc(t.heading(theme.name))}<span class="mark">.</span></h1>
+<p class="facts"><span><b>${total}</b> ${esc(t.pages(total))}</span><span><b>${parts.length}</b> ${esc(t.files(parts.length))}</span></p>
+<section class="group" aria-labelledby="parts-h"><header class="group-head"><h2 id="parts-h">${esc(t.filesSection)}</h2><span class="count">${parts.length}</span></header><ol class="rows">
 ${rows}
 </ol></section>`;
-  return shell(theme, "Sitemap index", body, options);
+  return shell(theme, t.indexTitle, body, options);
 }
 
 /** The XML styled with CSS, for browsers that open the sitemap without sending Sec-Fetch-Dest. */
@@ -236,7 +242,7 @@ export const PAGE_JS = `(function () {
       if (ok) shown++;
     });
     groups.forEach(function (g) { g.hidden = !g.querySelector(".row:not([hidden])"); });
-    tally.textContent = term || lang ? shown + " of " + rows.length + " pages" : "";
+    tally.textContent = term || lang ? (tally.getAttribute("data-t") || "{shown} of {total} pages").replace("{shown}", shown).replace("{total}", rows.length) : "";
     empty.hidden = shown !== 0;
   }
   q.addEventListener("input", apply);

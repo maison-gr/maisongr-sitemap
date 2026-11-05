@@ -118,6 +118,8 @@ export type StaticOptions = {
   extra?: string[];
   /** Force /about over /about.html, whatever the site's links do. */
   cleanUrls?: boolean;
+  /** The page's language. Default the one the home page declares in <html lang>. */
+  lang?: string;
 };
 
 export function buildStatic(dir: string, site: string, options: StaticOptions = {}): StaticReport {
@@ -163,7 +165,7 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
   ].join("\n");
   const icon = ["favicon.svg", "icon.svg", "favicon.png", "favicon.ico"].find((n) => files.some((f) => relative(dir, f) === n));
   const theme = themeOf({ css, pages: [...sources.values()], home: homeHtml, icon: icon && `/${icon}`, name: options.name, base });
-  return { pages: entries.length, skipped, written: writeSitemapFiles(dir, entries, theme, options.credit), theme };
+  return { pages: entries.length, skipped, written: writeSitemapFiles(dir, entries, theme, { credit: options.credit, lang: options.lang ?? htmlLang(homeHtml) }), theme };
 }
 
 /** What one page says about itself: why it is left out, or its entry (language, alternates, images). */
@@ -194,12 +196,15 @@ export function themeOf(site: { css: string; pages: string[]; home: string; icon
 }
 
 /** sitemap.xml (styled by sitemap.css) for crawlers, and the designed page at /sitemap/ for people. */
-export function writeSitemapFiles(dir: string, entries: Entry[], theme: Theme, credit?: boolean): string[] {
+/** The language a page declares: <html lang="fr-CA">. */
+export const htmlLang = (html: string) => attr(html.match(/<html\b[^>]*>/i)?.[0] ?? "", "lang");
+
+export function writeSitemapFiles(dir: string, entries: Entry[], theme: Theme, page: { credit?: boolean; lang?: string } = {}): string[] {
   mkdirSync(join(dir, "sitemap"), { recursive: true });
   const written = [
     ["sitemap.xml", urlsetXml(entries, "/sitemap.css")],
     ["sitemap.css", xmlCss(theme)],
-    ["sitemap/index.html", urlsetPage(entries, theme, { credit, assets: { css: "/sitemap/page.css", js: "/sitemap/page.js" } })],
+    ["sitemap/index.html", urlsetPage(entries, theme, { ...page, assets: { css: "/sitemap/page.css", js: "/sitemap/page.js" } })],
     ["sitemap/page.css", pageCss(theme)],
     ["sitemap/page.js", PAGE_JS],
   ] as const;
