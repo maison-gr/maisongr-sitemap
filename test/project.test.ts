@@ -88,6 +88,15 @@ describe("Next.js routes", () => {
     ]);
   });
 
+  it("treats a page as private when a private word is part of its name, but not inside another word", () => {
+    const root = project(
+      Object.fromEntries(
+        ["account-recovery", "confirm-email-change", "sign-in", "log-out", "order-confirmation", "reset_password", "accounting-services", "signature", "apiary", "cartography", "login-help-center"].map((n) => [`app/${n}/page.tsx`, ""]),
+      ),
+    );
+    expect(appRoutes(root, "app").routes.map((r) => r.pattern).sort()).toEqual(["/accounting-services", "/apiary", "/cartography", "/signature"]);
+  });
+
   it("reads noindex passed to a layout as a prop, but not noindex={false}", () => {
     const root = project({
       "app/a/page.tsx": "<Shell noindex>",

@@ -10,17 +10,27 @@ export type FoundRoute = {
 
 export type Skipped = { pattern: string; reason: string };
 
-/** Sign-in, account and similar pages never belong in a sitemap. */
-export const PRIVATE_SEGMENTS = new Set([
-  "login", "logout", "signin", "sign-in", "signup", "sign-up", "register", "auth", "account", "accounts",
-  "dashboard", "settings", "admin", "checkout", "onboarding", "reset-password", "forgot-password",
-  "verify", "verify-email", "invite", "invitation", "api",
+/**
+ * Words that make a page private wherever they appear in its name, as whole
+ * words: "account-recovery", "confirm-email-change" and "reset-password" are
+ * private; "accounting-services" is not.
+ */
+export const PRIVATE_WORDS = new Set([
+  "login", "logout", "signin", "signout", "signup", "register", "auth", "oauth", "sso", "callback",
+  "account", "accounts", "dashboard", "settings", "admin", "checkout", "cart", "billing", "onboarding",
+  "password", "verify", "confirm", "confirmation", "recovery", "unsubscribe", "invite", "invitation", "api",
 ]);
+
+/** Written as two words: sign-in, sign-up, sign-out, log-in, log-out. */
+const SPLIT_WORDS = /(^|-)(sign|log)-(in|up|out)(-|$)/;
 
 /** Developer and test pages: dev-reset, debug, test-email, internal… */
 const TOOL_SEGMENT = /^(dev|debug|test|internal|sandbox)(-|$)/;
 
-export const privateOf = (segments: string[]) => segments.find((s) => PRIVATE_SEGMENTS.has(s) || TOOL_SEGMENT.test(s));
+const isPrivate = (segment: string) =>
+  !/^[[(]/.test(segment) && (SPLIT_WORDS.test(segment) || TOOL_SEGMENT.test(segment) || segment.split(/[-_.]/).some((w) => PRIVATE_WORDS.has(w)));
+
+export const privateOf = (segments: string[]) => segments.find(isPrivate);
 
 /**
  * robots: { index: false }, robots: "noindex", a noindex meta tag, or a

@@ -98,7 +98,7 @@ describe("Nuxt routes", () => {
       "app/pages/[[lang]]/about.vue": "",
       "app/pages/docs/[...path].vue": "",
       "app/pages/users-[group]/[id].vue": "",
-      "app/pages/(shop)/cart.client.vue": "",
+      "app/pages/(shop)/catalogue.client.vue": "",
       "app/pages/-draft.vue": "",
       "app/pages/blog/[slug].spec.ts": "",
       "app/pages/types.d.ts": "",
@@ -106,7 +106,7 @@ describe("Nuxt routes", () => {
       "app/pages/preview.vue": "<script setup>useSeoMeta({ robots: 'noindex, nofollow' })</script>",
     });
     const found = nuxtRoutes(root, "app/pages");
-    expect(patterns(found)).toEqual(["/", "/[[lang]]/about", "/blog", "/blog/[slug]", "/cart", "/docs/[[...path]]", "/users-[group]/[id]"]);
+    expect(patterns(found)).toEqual(["/", "/[[lang]]/about", "/blog", "/blog/[slug]", "/catalogue", "/docs/[[...path]]", "/users-[group]/[id]"]);
     expect(found.routes.find((r) => r.pattern === "/blog")!.files).toEqual(["app/pages/blog/index.vue", "app/pages/blog.vue"]);
     expect(found.skipped).toEqual([
       { pattern: "/preview", reason: "noindex" },
