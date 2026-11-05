@@ -4,6 +4,16 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Added
+
+- `maisongr-sitemap/vite`: a Vite plugin that serves the sitemap during `vite dev`, where the build's static step never runs and the app's catch-all route answered `/sitemap.xml` with its 404. It answers `/sitemap.xml`, `/sitemap/` and their files from the router's routes and the source stylesheets, the same files the build writes, and reads the routes again on each request.
+
+### Fixed
+
+- `build` no longer warns about a dynamic route that the route file gives values for, and a route named only in a comment still counts as missing.
+- Static mode wrote a font's `@font-face` twice when the build held it both in a stylesheet and inlined in the home page.
+- A single-page app's routes and `--add` addresses take the language `index.html` declares, so the page counts every page in it, not only the prerendered ones.
+
 ## [1.4.1] - 2026-11-05
 
 ### Fixed

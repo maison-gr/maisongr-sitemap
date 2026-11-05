@@ -165,7 +165,16 @@ describe("a hand-written HTML site", () => {
     const report = buildStatic(root, "https://orbit.example", { extra: ["/pricing", "about", "/"] });
     expect(report.theme.name).toBe("Orbit");
     expect(report.pages).toBe(3);
+    // The added addresses render from index.html, so they speak its language too.
+    expect(readFileSync(join(root, "sitemap/index.html"), "utf8")).toContain("<b>3</b> EN");
     expect(siteNameOf([], "<title>Orbit — Plan your launch</title>")).toBe("Orbit");
+  });
+
+  it("loads each font once, though a build holds its @font-face in a stylesheet and inlined in the home page", () => {
+    const face = '@font-face{font-family:Inter;src:url("/fonts/inter.woff2") format("woff2");font-weight:400 700}';
+    const root = project({ "index.html": page("Orbit", `<style>${face}</style>`), "assets/index.css": face });
+    const report = buildStatic(root, "https://orbit.example");
+    expect(report.theme.fonts.find((f) => f.family === "Inter")!.files).toHaveLength(1);
   });
 });
 

@@ -288,6 +288,19 @@ It reads React Router, Vue Router, TanStack Router, Solid Router, Wouter, Preact
 
 Your host must serve `index.html` for paths it has no file for (the usual single-page app setting on Netlify, Vercel, Cloudflare Pages and the rest), so every listed page answers.
 
+**In `vite dev`.** The build writes the sitemap, so the dev server has none, and your app's catch-all route answers `/sitemap.xml` with its 404. Add the plugin to see it while you work:
+
+```ts
+// vite.config.ts
+import { sitemap } from "maisongr-sitemap/vite";
+
+export default defineConfig({
+  plugins: [react(), sitemap({ site: "https://www.example.com" })],
+});
+```
+
+It serves `/sitemap.xml` and `/sitemap/` from your router's routes and source stylesheets, the same files the build writes, and reads the routes again on each request. It runs in dev only; the build's `static` step still writes the real files. It takes `add`, `name`, `lang` and `credit`, like the command's flags.
+
 ## Any site, in any language
 
 For a site no file describes, PHP, Python, Ruby, Go, a CMS, `crawl` reads it the way a search engine does: from the home page, along its own links.

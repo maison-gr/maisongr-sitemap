@@ -91,8 +91,10 @@ function siteFonts(css: string): Font[] {
     if (!family || !url) continue;
     const existing = fonts.find((f) => f.family === family);
     const file = { url, weight: body.match(/font-weight\s*:\s*([^;]+)/)?.[1]?.trim(), style: body.match(/font-style\s*:\s*([^;]+)/)?.[1]?.trim() };
-    if (existing) existing.files.push(file);
-    else fonts.push({ family, role: /mono|code/i.test(family) ? "mono" : fonts.some((f) => f.role === "body") ? "display" : "body", files: [file] });
+    // A build can hold the same @font-face twice (a stylesheet and the CSS inlined into the home page).
+    if (existing) {
+      if (!existing.files.some((f) => f.url === file.url && f.weight === file.weight && f.style === file.style)) existing.files.push(file);
+    } else fonts.push({ family, role: /mono|code/i.test(family) ? "mono" : fonts.some((f) => f.role === "body") ? "display" : "body", files: [file] });
   }
   return fonts.filter((f, i, all) => all.findIndex((g) => g.role === f.role) === i);
 }
@@ -149,6 +151,10 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
     const lastmod = dates.get(relative(dir, file).split(sep).join("/"));
     entries.push({ ...facts.entry, ...(lastmod ? { lastmod } : {}) });
   }
+  const home = files.find((f) => relative(dir, f) === "index.html");
+  const homeHtml = home ? sources.get(home)! : "";
+  // An address no file holds is a route the app renders from index.html, in its language.
+  const homeLang = htmlLang(homeHtml);
   for (const item of options.extra ?? []) {
     const { path: raw, lastmod } = typeof item === "string" ? { path: item, lastmod: undefined } : item;
     const path = raw.startsWith("/") ? raw : `/${raw}`;
@@ -157,12 +163,10 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
     // A prerendered page in the build output has no Git date; the route's component file has one.
     if (known) {
       if (!known.lastmod && lastmod) known.lastmod = lastmod;
-    } else entries.push({ loc, ...(lastmod ? { lastmod } : {}) });
+    } else entries.push({ loc, ...(homeLang ? { lang: homeLang } : {}), ...(lastmod ? { lastmod } : {}) });
   }
   entries.sort((a, b) => a.loc.localeCompare(b.loc));
 
-  const home = files.find((f) => relative(dir, f) === "index.html");
-  const homeHtml = home ? sources.get(home)! : "";
   // Stylesheets, then the CSS a build inlined into the home page (Astro and Vite inline small ones).
   const css = [
     ...files.filter((f) => f.endsWith(".css") && !f.includes(`${sep}sitemap${sep}`) && relative(dir, f) !== "sitemap.css").map((f) => readFileSync(f, "utf8")),
@@ -170,7 +174,7 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
   ].join("\n");
   const icon = ["favicon.svg", "icon.svg", "favicon.png", "favicon.ico"].find((n) => files.some((f) => relative(dir, f) === n));
   const theme = themeOf({ css, pages: [...sources.values()], home: homeHtml, icon: icon && `/${icon}`, name: options.name, base });
-  return { pages: entries.length, skipped, written: writeSitemapFiles(dir, entries, theme, { credit: options.credit, lang: options.lang ?? htmlLang(homeHtml) }), theme };
+  return { pages: entries.length, skipped, written: writeSitemapFiles(dir, entries, theme, { credit: options.credit, lang: options.lang ?? homeLang }), theme };
 }
 
 /** What one page says about itself: why it is left out, or its entry (language, alternates, images). */
@@ -204,15 +208,20 @@ export function themeOf(site: { css: string; pages: string[]; home: string; icon
 /** The language a page declares: <html lang="fr-CA">. */
 export const htmlLang = (html: string) => attr(html.match(/<html\b[^>]*>/i)?.[0] ?? "", "lang");
 
-export function writeSitemapFiles(dir: string, entries: Entry[], theme: Theme, page: { credit?: boolean; lang?: string } = {}): string[] {
-  mkdirSync(join(dir, "sitemap"), { recursive: true });
-  const written = [
+/** The five files static mode serves, by path: what writeSitemapFiles writes, and what the Vite plugin answers in dev. */
+export function sitemapFiles(entries: Entry[], theme: Theme, page: { credit?: boolean; lang?: string } = {}): [string, string][] {
+  return [
     ["sitemap.xml", urlsetXml(entries, "/sitemap.css")],
     ["sitemap.css", xmlCss(theme)],
     ["sitemap/index.html", urlsetPage(entries, theme, { ...page, assets: { css: "/sitemap/page.css", js: "/sitemap/page.js" } })],
     ["sitemap/page.css", pageCss(theme)],
     ["sitemap/page.js", PAGE_JS],
-  ] as const;
+  ];
+}
+
+export function writeSitemapFiles(dir: string, entries: Entry[], theme: Theme, page: { credit?: boolean; lang?: string } = {}): string[] {
+  mkdirSync(join(dir, "sitemap"), { recursive: true });
+  const written = sitemapFiles(entries, theme, page);
   for (const [file, body] of written) writeFileSync(join(dir, file), body);
   return written.map(([f]) => f);
 }

@@ -24,6 +24,9 @@
       ],
       "node": [
         "./dist/node.d.ts"
+      ],
+      "vite": [
+        "./dist/vite.d.ts"
       ]
     }
   },
@@ -42,6 +45,10 @@
     "./node": {
       "types": "./dist/node.d.ts",
       "default": "./dist/node.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     },
     "./package.json": "./package.json"
   },
@@ -68,6 +75,7 @@
     "sveltekit",
     "nuxt",
     "express",
+    "vite",
     "hreflang",
     "lastmod",
     "image-sitemap",
