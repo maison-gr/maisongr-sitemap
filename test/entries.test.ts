@@ -120,6 +120,19 @@ describe("a default language without a prefix", () => {
   });
 });
 
+describe("regional hreflang codes", () => {
+  it("announces each language with the code its pages declare, keeping the URL's", async () => {
+    const locales = { list: ["fr", "en"], default: "fr", hreflang: { fr: "fr-CA", en: "en-CA" } };
+    const out = await expand([{ pattern: "/[lang]/work" }], { site, locales });
+    expect(out.map((e) => [e.loc, e.lang])).toEqual([[`${site}/fr/work`, "fr"], [`${site}/en/work`, "en"]]);
+    expect(out[0]!.alternates).toEqual([
+      { hreflang: "fr-CA", href: `${site}/fr/work` },
+      { hreflang: "en-CA", href: `${site}/en/work` },
+      { hreflang: "x-default", href: `${site}/fr/work` },
+    ]);
+  });
+});
+
 describe("languages kept in folders", () => {
   const locales = { list: ["en", "fr", "es"], default: "en", folders: true, prefixDefault: false };
 

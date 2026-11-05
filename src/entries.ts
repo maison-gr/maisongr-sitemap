@@ -43,7 +43,16 @@ export type Locales = {
    * language is taken off are versions of one page.
    */
   folders?: boolean;
+  /**
+   * The hreflang each language is announced with, when it isn't the code in the
+   * URL: { fr: "fr-CA", en: "en-CA" } for /fr and /en pages that declare
+   * fr-CA and en-CA. It must match what the pages themselves declare.
+   */
+  hreflang?: Record<string, string>;
 };
+
+/** The hreflang a language is announced with: its regional code if the site gives one. */
+const hreflangOf = (locale: string, locales?: Locales) => locales?.hreflang?.[locale] ?? locale;
 
 /** With prefix routing, "/pricing" is really "/[locale]/pricing". */
 const withPrefix = (pattern: string, locales?: Locales) =>
@@ -164,7 +173,7 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
         locale === fallback && options.locales!.prefixDefault === false ? tail : `/${locale}${tail === "/" ? "" : tail}`;
       const present = versions.map((v) => v.locale);
       const alternates = [
-        ...present.map((l) => ({ hreflang: l, href: url(pathOf(l)) })),
+        ...present.map((l) => ({ hreflang: hreflangOf(l, options.locales), href: url(pathOf(l)) })),
         ...(present.includes(fallback) ? [{ hreflang: "x-default", href: url(pathOf(fallback)) }] : []),
       ];
       for (const v of versions) {
@@ -201,7 +210,7 @@ export function linkFolders(plain: { path: string; entry: Entry }[], locales: Lo
     group.sort((a, b) => locales.list.indexOf(a.lang) - locales.list.indexOf(b.lang));
     const fallback = group.find((v) => v.lang === locales.default);
     const alternates = [
-      ...group.map((v) => ({ hreflang: v.lang, href: v.entry.loc })),
+      ...group.map((v) => ({ hreflang: hreflangOf(v.lang, locales), href: v.entry.loc })),
       ...(fallback ? [{ hreflang: "x-default", href: fallback.entry.loc }] : []),
     ];
     for (const v of group) {

@@ -223,9 +223,10 @@ describe("a site with no root layout, languages as a TypeScript type, and a not-
       "src/app/[lang]/work/[slug]/page.tsx": `export default async function P({ params }) { const p = await get(params); if (!p) notFound(); return <h1 />; }`,
       "src/app/[lang]/resistaa/page.tsx": `import { redirect } from "next/navigation";\nexport default async function Legacy({ params }) {\n  const { lang } = await params;\n  redirect(\`/\${lang}/work/resistaa\`);\n}`,
       "src/lib/i18n.ts": 'export type Lang = "fr" | "en";\nexport const translations = {};',
+      "src/lib/localized-seo.ts": 'export const alternates = (slug) => ({ languages: { "fr-CA": url("fr", slug), "en-CA": url("en", slug) } });',
     });
     const report = await buildNext(root, detect(root) as never, { offline: true });
-    expect(report.locales).toEqual({ list: ["fr", "en"], default: "fr" });
+    expect(report.locales).toEqual({ list: ["fr", "en"], default: "fr", hreflang: { fr: "fr-CA", en: "en-CA" } });
     expect(report.theme).toMatchObject({ name: "Maison GR", light: { background: "#f4f2ee" } });
     expect([...report.skipped].sort((a, b) => a.pattern.localeCompare(b.pattern))).toEqual([
       { pattern: "/[lang]/[...missing]", reason: "not-found page" },

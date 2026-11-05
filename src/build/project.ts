@@ -55,6 +55,24 @@ export function findLocales(files: string[]): { list: string[]; default: string 
   return undefined;
 }
 
+/**
+ * Regional hreflang codes the pages declare for each language, from Next.js
+ * metadata: alternates: { languages: { "fr-CA": …, "en-CA": … } } gives
+ * { fr: "fr-CA", en: "en-CA" }. The sitemap must announce the same codes.
+ */
+export function findHreflang(files: string[], list: readonly string[]): Record<string, string> | undefined {
+  const map: Record<string, string> = {};
+  for (const f of files) {
+    for (const block of read(f).matchAll(/\blanguages\s*:\s*\{([^{}]*)\}/g)) {
+      for (const key of block[1]!.matchAll(/["']([a-z]{2,3})-([A-Za-z]{2,4})["']\s*:/g)) {
+        const [code, primary] = [`${key[1]}-${key[2]}`, key[1]!];
+        if (list.includes(primary) && !list.includes(code) && !map[primary]) map[primary] = code;
+      }
+    }
+  }
+  return Object.keys(map).length ? map : undefined;
+}
+
 /** The address the site is served at: metadataBase, a SITE_URL constant, or the environment. */
 export function findSite(files: string[]): string | undefined {
   const env = process.env.SITEMAP_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL ?? process.env.NUXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;

@@ -6,7 +6,7 @@ import type { Detected } from "./detect.js";
 import { nextFonts } from "./fonts.js";
 import { read, writeManifest, type BuildReport } from "./manifest.js";
 import { appRoutes, pagesRoutes } from "./next-routes.js";
-import { cssFiles, findIcon, findLocales, findName, findSite, sourceFiles } from "./project.js";
+import { cssFiles, findHreflang, findIcon, findLocales, findName, findSite, sourceFiles } from "./project.js";
 
 export type { BuildReport };
 
@@ -22,7 +22,9 @@ function localesOf(root: string, routes: { pattern: string }[], files: string[])
   const prefixed = !segmented && !!middleware && /locale/i.test(read(middleware));
   if (!segmented && !prefixed) return undefined;
   const found = findLocales(files);
-  return found ? { ...found, ...(prefixed ? { prefix: true } : {}) } : undefined;
+  if (!found) return undefined;
+  const hreflang = findHreflang(files, found.list);
+  return { ...found, ...(prefixed ? { prefix: true } : {}), ...(hreflang ? { hreflang } : {}) };
 }
 
 /**
