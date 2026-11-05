@@ -48,6 +48,7 @@ export function configOf(root: string, names: string[]): { file: string; source:
 export const ASTRO_CONFIGS = ["astro.config.mjs", "astro.config.ts", "astro.config.mts", "astro.config.js", "astro.config.cjs"];
 export const SVELTE_CONFIGS = ["svelte.config.js", "svelte.config.ts", "vite.config.ts", "vite.config.js", "vite.config.mts", "vite.config.mjs"];
 export const NUXT_CONFIGS = ["nuxt.config.ts", "nuxt.config.js", "nuxt.config.mjs"];
+export const TAILWIND_CONFIGS = ["tailwind.config.js", "tailwind.config.ts", "tailwind.config.cjs", "tailwind.config.mjs"];
 
 export function detect(root: string): Detected {
   const pkg = readPackage(root);

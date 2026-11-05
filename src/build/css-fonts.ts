@@ -41,14 +41,24 @@ function group(faces: Face[], role: (family: string) => FontRole | null): Found[
   return [...families].map(([family, list]) => ({ kind: "local", family, role: role(family), files: list.map(({ family: _, ...file }) => file) }));
 }
 
+/** A package's folder as Node finds it: in node_modules here, or in a parent's, where workspaces hoist it. */
+function packageDir(root: string, name: string): string | undefined {
+  for (let dir = resolve(root); ; dir = dirname(dir)) {
+    const candidate = join(dir, "node_modules", name);
+    if (existsSync(candidate)) return candidate;
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
 /** Fontsource packages the code or the CSS imports: their Latin files are already in node_modules. */
 function fontsource(root: string, sources: string[]): Face[] {
   const faces: Face[] = [];
   const seen = new Set<string>();
   for (const src of sources) {
     for (const m of src.matchAll(/["'](@fontsource(?:-variable)?\/[\w-]+)(\/[\w./-]+\.css)?["']/g)) {
-      const css = join(root, "node_modules", m[1]!, m[2] ?? "index.css");
-      if (seen.has(css) || !existsSync(css)) continue;
+      const dir = packageDir(root, m[1]!);
+      const css = dir ? join(dir, m[2] ?? "index.css") : "";
+      if (!css || seen.has(css) || !existsSync(css)) continue;
       seen.add(css);
       faces.push(...fontFaces(readFileSync(css, "utf8"), css, ""));
     }
@@ -63,6 +73,21 @@ function astroConfigFonts(config: string): Found[] {
     if (!/cssVariable/.test(m[0])) continue;
     const variable = m[0].match(/cssVariable\s*:\s*["'](--[\w-]+)["']/)?.[1];
     out.push({ kind: "google", family: m[1]!, role: hintOf(variable, m[1]!) });
+  }
+  return out;
+}
+
+/** Tailwind's theme.fontFamily (v3 config): { display: ['"Fraunces Variable"', "serif"], sans: [...], mono: [...] }. */
+function tailwindFamilies(config: string): Found[] {
+  const start = config.search(/\bfontFamily\s*:\s*\{/);
+  if (start === -1) return [];
+  const body = config.slice(config.indexOf("{", start) + 1);
+  const out: Found[] = [];
+  // Each key and the first quoted family in its list, until the block closes.
+  for (const m of body.matchAll(/(?:^|[,{\s])["']?([\w-]+)["']?\s*:\s*\[\s*["'`]+([^"'`]+)["'`]+|\}/g)) {
+    if (m[0] === "}") break;
+    const family = unquote(m[2]!);
+    if (!GENERIC.test(family)) out.push({ kind: "google", family, role: hintOf(m[1], family) });
   }
   return out;
 }
@@ -91,16 +116,25 @@ function askedFamilies(css: string): Found[] {
  * keeps one font per role, so a family found on disk wins over the same
  * family found only by name.
  */
-export function cssFonts(options: { root: string; stylesheets: { file: string; css: string }[]; sources: string[]; publicDir: string; astroConfig?: string }): FontSource[] {
+export function cssFonts(options: {
+  root: string;
+  stylesheets: { file: string; css: string }[];
+  sources: string[];
+  publicDir: string;
+  astroConfig?: string;
+  tailwindConfig?: string;
+}): FontSource[] {
   const tokens = new Map<string, FontRole>();
-  for (const { css } of options.stylesheets) {
-    for (const f of askedFamilies(css)) if (f.role && !tokens.has(f.family)) tokens.set(f.family, f.role);
+  const tailwind = options.tailwindConfig ? tailwindFamilies(options.tailwindConfig) : [];
+  for (const f of [...tailwind, ...options.stylesheets.flatMap(({ css }) => askedFamilies(css))]) {
+    if (f.role && !tokens.has(f.family)) tokens.set(f.family, f.role);
   }
   const roleOf = (family: string) => tokens.get(family) ?? hintOf(undefined, family);
   const found: Found[] = [
     ...group(options.stylesheets.flatMap(({ file, css }) => fontFaces(css, file, options.publicDir)), roleOf),
     ...group(fontsource(options.root, [...options.sources, ...options.stylesheets.map((s) => s.css)]), roleOf),
     ...(options.astroConfig ? astroConfigFonts(options.astroConfig) : []),
+    ...tailwind,
     ...options.stylesheets.flatMap(({ css }) => askedFamilies(css)),
   ];
   const unique = found.filter((f, i) => found.findIndex((g) => g.family === f.family) === i);

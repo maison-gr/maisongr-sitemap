@@ -4,7 +4,7 @@ import { trimSlashes } from "../entries.js";
 import type { Manifest } from "../types.js";
 import { astroRoutes } from "./astro-routes.js";
 import { cssFonts } from "./css-fonts.js";
-import { ASTRO_CONFIGS, configOf, NUXT_CONFIGS, readPackage, SVELTE_CONFIGS, type Detected } from "./detect.js";
+import { ASTRO_CONFIGS, configOf, NUXT_CONFIGS, readPackage, SVELTE_CONFIGS, TAILWIND_CONFIGS, type Detected } from "./detect.js";
 import { read, writeManifest, type BuildReport, type ProjectFacts } from "./manifest.js";
 import { nuxtRoutes } from "./nuxt-routes.js";
 import { filesIn, findIcon, findLocales, findName, findSite, sourceFiles, styleBlocks } from "./project.js";
@@ -77,7 +77,7 @@ const httpSite = (url: string | undefined) => (url && !/localhost|127\.0\.0\.1|e
 const base = (path: string | undefined) => (path && path !== "/" ? `/${path.replace(/^\/+|\/+$/g, "")}` : undefined);
 
 /** The facts every framework shares: stylesheets and fonts from its source directories. */
-function themeFacts(root: string, dirs: string[], layouts: string[], publicDir: string, astroConfig?: string) {
+export function themeFacts(root: string, dirs: string[], layouts: string[], publicDir: string, astroConfig?: string) {
   const stylesheets = dirs.flatMap((d) => filesIn(root, d, CSS));
   const inlineStyles = layouts.filter(existsSync).map((f) => styleBlocks(read(f)));
   const code = dirs.flatMap((d) => filesIn(root, d, CODE));
@@ -87,6 +87,7 @@ function themeFacts(root: string, dirs: string[], layouts: string[], publicDir: 
     sources: code.map(read),
     publicDir,
     astroConfig,
+    tailwindConfig: configOf(root, TAILWIND_CONFIGS)?.source,
   });
   return { stylesheets, inlineStyles, fonts };
 }
