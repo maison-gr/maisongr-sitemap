@@ -27,6 +27,10 @@
       "types": "./dist/next.d.ts",
       "default": "./dist/next.js"
     },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
