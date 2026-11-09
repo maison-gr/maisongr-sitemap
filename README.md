@@ -38,7 +38,7 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 
 ## Why
 
-- **Browsers are removing XSLT.** A sitemap styled with an `.xsl` file now opens on a warning, or not at all.
+- **Browsers are removing XSLT.** Chrome 158 turns it off on **17 November 2026** ([Chrome's timeline](https://developer.chrome.com/docs/web-platform/deprecating-xslt)). A sitemap styled with an `.xsl` file now opens on a warning, or not at all. This package needs no XSLT: the page is HTML, and the XML's fallback styling is CSS, which Chrome keeps.
 - **Hand-written sitemaps drift.** A new page, a new language or a renamed route is forgotten until Search Console complains.
 - **`<lastmod>` is usually false.** Most generators stamp the build time on every page, so Google and Bing learn to ignore it. This one uses the date of the last commit that changed each page.
 
