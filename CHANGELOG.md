@@ -12,6 +12,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 - The repository is now `maison-gr/maisongr-sitemap`, matching the npm package. The old address redirects. The Agent Skill installs with `npx skills add maison-gr/maisongr-sitemap`; the MCP server keeps its registry name, `io.github.maison-gr/sitemap`.
 
+### Fixed
+
+- `indexnow` follows only the parts of a sitemap index on the site's own host, as search engines do, so a sitemap can no longer make it fetch another address. Reading the sitemap and checking the key file now give up after 20 seconds instead of waiting forever.
+
 ## [1.7.0] - 2026-11-10
 
 The XML search engines read is byte for byte what 1.6.0 served; every change below is about the page people see, and about keeping the two answers apart.

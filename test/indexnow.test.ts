@@ -86,6 +86,19 @@ describe("the indexnow command", () => {
     expect(err).toContain("did not accept every batch");
   });
 
+  it("follows only the parts of an index on the site's own host", async () => {
+    const elsewhere = "http://169.254.169.254/latest/meta-data";
+    const index = indexXml([{ loc: `${site}/sitemap-pages.xml` }, { loc: elsewhere }]);
+    const sent = network({ [`${site}/${KEY}.txt`]: KEY, [`${site}/sitemap.xml`]: index, [`${site}/sitemap-pages.xml`]: sitemap, [elsewhere]: sitemap });
+    const fetched: string[] = [];
+    const fake = globalThis.fetch;
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (fetched.push(url), fake(url, init)));
+    const { code } = await run(["indexnow", "--site", site, "--key", KEY, "--all"]);
+    expect(code).toBe(0);
+    expect(fetched).not.toContain(elsewhere);
+    expect(sent.map((s) => s.body.urlList)).toEqual([[`${site}/`, `${site}/new`, `${site}/undated`]]);
+  });
+
   it("with --wait, waits for a deploy to serve the key before sending", async () => {
     let checks = 0;
     const sent: unknown[] = [];
