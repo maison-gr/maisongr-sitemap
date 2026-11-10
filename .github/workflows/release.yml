@@ -5,7 +5,7 @@ name: Release
 # this workflow run and commit.
 #
 # Set up once on npmjs.com, in the package's settings → Trusted publisher:
-# GitHub Actions, organisation maison-gr, repository sitemap, workflow release.yml,
+# GitHub Actions, organisation maison-gr, repository maisongr-sitemap, workflow release.yml,
 # environment npm, and allow `npm publish`.
 
 on:

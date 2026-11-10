@@ -128,7 +128,7 @@ function newestDate(dates: (string | undefined)[]): Date | undefined {
   return times.length ? new Date(Math.max(...times)) : undefined;
 }
 
-const TOOL = '<a href="https://github.com/maison-gr/sitemap" rel="noopener">maisongr-sitemap</a>';
+const TOOL = '<a href="https://github.com/maison-gr/maisongr-sitemap" rel="noopener">maisongr-sitemap</a>';
 const STUDIO = '<a href="https://www.maisongr.com" rel="noopener">Maison GR</a>';
 
 function shell(theme: Theme, title: string, body: string, options: PageOptions, updated?: Date): string {

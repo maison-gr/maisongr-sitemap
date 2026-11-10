@@ -23,12 +23,12 @@ Run from the project's root, then do what the report's Next section says.
 
 - `--json` on any command prints one report on stdout. Exit codes: 0 done, 1 stopped with a reason, 2 a bug in the tool.
 - No command waits for input. `connect` changes robots.txt only with `--yes`.
-- `npx skills add maison-gr/sitemap` installs the Agent Skill.
+- `npx skills add maison-gr/maisongr-sitemap` installs the Agent Skill.
 - `npx maisongr-sitemap mcp` serves the commands as tools over MCP (stdio), in the folder it starts in.
 
 ## Docs
 
-- [README](https://github.com/maison-gr/sitemap#readme): every option, framework and limit
-- [Agent Skill](https://github.com/maison-gr/sitemap/blob/main/skills/maisongr-sitemap/SKILL.md): the steps for a coding agent
-- [Changelog](https://github.com/maison-gr/sitemap/blob/main/CHANGELOG.md)
+- [README](https://github.com/maison-gr/maisongr-sitemap#readme): every option, framework and limit
+- [Agent Skill](https://github.com/maison-gr/maisongr-sitemap/blob/main/skills/maisongr-sitemap/SKILL.md): the steps for a coding agent
+- [Changelog](https://github.com/maison-gr/maisongr-sitemap/blob/main/CHANGELOG.md)
 - [npm](https://www.npmjs.com/package/maisongr-sitemap)

@@ -376,7 +376,7 @@ describe("the page's footer", () => {
   it("credits the open-source tool and the studio, each a link, unless credit is off", async () => {
     const { urlsetPage } = await import("../src/page.js");
     const html = urlsetPage([e("/")], manifest.theme);
-    expect(html).toContain('Made with <a href="https://github.com/maison-gr/sitemap" rel="noopener">maisongr-sitemap</a>, open source, by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a>');
+    expect(html).toContain('Made with <a href="https://github.com/maison-gr/maisongr-sitemap" rel="noopener">maisongr-sitemap</a>, open source, by <a href="https://www.maisongr.com" rel="noopener">Maison GR</a>');
     expect(urlsetPage([e("/")], manifest.theme, { lang: "fr" })).toContain("maisongr-sitemap</a>, outil open source de <a");
     expect(urlsetPage([e("/")], manifest.theme, { credit: false })).not.toContain('class="credit"');
   });

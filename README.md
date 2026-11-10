@@ -3,7 +3,7 @@
 **One sitemap, two readers.** Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode: every address as a link, one row per page with its language versions side by side, and on a longer list a filter and a newest-first sort.
 
 [![npm version](https://img.shields.io/npm/v/maisongr-sitemap?color=1b1a17)](https://www.npmjs.com/package/maisongr-sitemap)
-[![CI](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml/badge.svg)](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml)
+[![CI](https://github.com/maison-gr/maisongr-sitemap/actions/workflows/ci.yml/badge.svg)](https://github.com/maison-gr/maisongr-sitemap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-1b1a17)](LICENSE)
 ![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-1b1a17)
 ![Node 20.9+](https://img.shields.io/badge/node-%E2%89%A520.9-1b1a17)
@@ -409,7 +409,7 @@ Run it again whenever content changes, after a deploy or from a daily cron, so t
 **Agent Skill.** Teaches Claude Code, Codex, Cursor and other coding agents the steps above:
 
 ```sh
-npx skills add maison-gr/sitemap
+npx skills add maison-gr/maisongr-sitemap
 ```
 
 **JSON.** `--json` on any command prints one report on stdout instead of the lines a person reads:

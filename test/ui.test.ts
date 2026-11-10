@@ -226,6 +226,6 @@ describe("what a person sees from each command", () => {
     const { code, err } = await run(["static", "dist", "--site", "https://a.dev"], root);
     expect(code).toBe(2);
     expect(err).toContain("✗ maisongr-sitemap stopped on an unexpected error:");
-    expect(err).toContain("https://github.com/maison-gr/sitemap/issues");
+    expect(err).toContain("https://github.com/maison-gr/maisongr-sitemap/issues");
   });
 });

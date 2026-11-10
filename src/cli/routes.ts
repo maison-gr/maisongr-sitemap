@@ -20,7 +20,7 @@ export const RIVALS: Record<ServerKind["kind"], string[]> = {
 
 const HEADER = (manifest: string) => `// The sitemap: XML for search engines, a designed page for people, at one address.
 // Routes, dates and theme come from ${manifest}, which \`${COMMAND}\` rewrites before each build.
-// Docs: https://github.com/maison-gr/sitemap`;
+// Docs: https://github.com/maison-gr/maisongr-sitemap`;
 
 const PARAMS_HINT = (example: string) => `  // Dynamic routes are listed once you give their values, for example:
   // params: ${example},`;
@@ -130,7 +130,7 @@ async function entries() {
 export function nodeModuleSource(format: "cjs" | "esm" | "ts", mount: string): string {
   const header = `// The sitemap: XML for search engines, a designed page for people, at /sitemap.xml.
 // The theme comes from ./sitemap.manifest.json, which \`${COMMAND}\` rewrites from the frontend this server serves.
-// Docs: https://github.com/maison-gr/sitemap
+// Docs: https://github.com/maison-gr/maisongr-sitemap
 //
 // Mount it before any catch-all route:  ${mount}
 // When content changes (a post is published), list it at once:  sitemap.invalidate()`;

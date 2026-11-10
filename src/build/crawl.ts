@@ -26,7 +26,7 @@ export type CrawlOptions = {
 export type CrawlReport = { entries: Entry[]; skipped: { path: string; reason: string }[]; theme: Theme; capped: boolean; queries: number; lang?: string };
 
 const NOT_PAGES = /\.(?:pdf|jpe?g|png|gif|webp|avif|svg|ico|bmp|css|js|mjs|json|xml|txt|csv|zip|gz|rar|7z|mp4|webm|mov|mp3|wav|ogg|woff2?|ttf|otf|eot|map|docx?|xlsx?|pptx?)$/i;
-const AGENT = "maisongr-sitemap (+https://github.com/maison-gr/sitemap)";
+const AGENT = "maisongr-sitemap (+https://github.com/maison-gr/maisongr-sitemap)";
 
 const tags = (html: string, name: string) => [...html.matchAll(new RegExp(`<${name}\\b[^>]*>`, "gi"))].map((m) => m[0]);
 const unescape = (s: string) => s.replace(/&amp;/g, "&");

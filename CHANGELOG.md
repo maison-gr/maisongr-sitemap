@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Changed
+
+- The repository is now `maison-gr/maisongr-sitemap`, matching the npm package. The old address redirects. The Agent Skill installs with `npx skills add maison-gr/maisongr-sitemap`; the MCP server keeps its registry name, `io.github.maison-gr/sitemap`.
+
 ## [1.7.0] - 2026-11-10
 
 The XML search engines read is byte for byte what 1.6.0 served; every change below is about the page people see, and about keeping the two answers apart.
@@ -29,7 +33,7 @@ The XML search engines read is byte for byte what 1.6.0 served; every change bel
 - `init --replace` takes over from another sitemap: next-sitemap, @astrojs/sitemap, @nuxtjs/sitemap, super-sitemap, svelte-sitemap, a hand-written route, or a sitemap in the public folder, with its `.xsl` file. The old files move to `.sitemap-replaced/`, nothing is deleted, the old tool leaves the scripts and the Astro or Nuxt config (copied aside first), and next-sitemap's `siteUrl` is kept. It warns about rules that don't carry over, and about Astro's address changing from `/sitemap-index.xml` to `/sitemap.xml`. `init` without the flag stops as before, and now says this is possible.
 - `--json` on any command prints one report on stdout, for scripts and coding agents.
 - `maisongr-sitemap mcp` serves the commands as tools over the Model Context Protocol (stdio).
-- An Agent Skill (`npx skills add maison-gr/sitemap`) and `llms.txt`, both in the package.
+- An Agent Skill (`npx skills add maison-gr/maisongr-sitemap`) and `llms.txt`, both in the package.
 
 ## [1.5.1] - 2026-11-05
 
@@ -171,12 +175,12 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
-[1.6.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.6.0
-[1.5.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.5.1
-[1.5.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.5.0
-[1.4.1]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.1
-[1.4.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.4.0
-[1.3.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.3.0
-[1.2.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.2.0
-[1.1.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.1.0
-[1.0.0]: https://github.com/maison-gr/sitemap/releases/tag/v1.0.0
+[1.6.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.6.0
+[1.5.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.5.1
+[1.5.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.5.0
+[1.4.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.4.1
+[1.4.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.4.0
+[1.3.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.3.0
+[1.2.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.2.0
+[1.1.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.1.0
+[1.0.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.0.0

@@ -77,4 +77,4 @@ If middleware rewrites or redirects every path, let `/sitemap.xml` and `/_sitema
 - `npx maisongr-sitemap llms --site https://the.site --from http://localhost:3000 --json` writes `llms.txt`.
 - `npx maisongr-sitemap indexnow` sends addresses to outside search engines. Run it only when the user asks.
 
-Full reference: https://github.com/maison-gr/sitemap#readme
+Full reference: https://github.com/maison-gr/maisongr-sitemap#readme

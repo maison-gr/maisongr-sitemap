@@ -52,7 +52,7 @@ const HELP = `
     --json         one JSON report on stdout, for scripts and agents
                    exit codes: 0 done, 1 stopped with a reason, 2 a bug in this tool
 
-  Docs: https://github.com/maison-gr/sitemap
+  Docs: https://github.com/maison-gr/maisongr-sitemap
 `;
 
 /** The package's own version, from the package.json beside dist/ (or src/). */
@@ -381,7 +381,7 @@ function whatElse() {
   u.next(u.code("npx maisongr-sitemap connect"), "robots.txt, and the files Google, Bing and IndexNow check");
   u.next(u.code("npx maisongr-sitemap indexnow --site <url> --key <key>"), "after a deploy, tell Bing and the other IndexNow engines what changed");
   u.next(u.code("npx maisongr-sitemap --help"), "every command and option");
-  u.next(u.code("https://github.com/maison-gr/sitemap#readme"), "the full guide");
+  u.next(u.code("https://github.com/maison-gr/maisongr-sitemap#readme"), "the full guide");
 }
 
 async function init() {
@@ -479,7 +479,7 @@ function runStatic() {
   }
   u.heading("Wrote");
   for (const f of report.written) u.ok(`${dir}/${f}`);
-  u.text(u.paint("One address for both: add your host's rule so a browser opening /sitemap.xml gets the page (sitemap/index.html). Cloudflare, Vercel: https://github.com/maison-gr/sitemap#one-address-on-a-static-host", "dim"));
+  u.text(u.paint("One address for both: add your host's rule so a browser opening /sitemap.xml gets the page (sitemap/index.html). Cloudflare, Vercel: https://github.com/maison-gr/maisongr-sitemap#one-address-on-a-static-host", "dim"));
 }
 
 /** Any site at all (PHP, Python, Ruby, a CMS): read it as a search engine would, and write the sitemap files where its server serves files. */
@@ -650,7 +650,7 @@ async function runLlms() {
     return `${from}${u.pathname}${u.search}`;
   };
   const getText = async (url: string) => {
-    const res = await fetch(url, { headers: { "user-agent": "maisongr-sitemap llms (+https://github.com/maison-gr/sitemap)" }, signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(url, { headers: { "user-agent": "maisongr-sitemap llms (+https://github.com/maison-gr/maisongr-sitemap)" }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(`${url} answered ${res.status}`);
     return res.text();
   };
@@ -828,7 +828,7 @@ export async function main(
       // A bug, not a mistake the person made: say so, with what to report.
       const message =
         `maisongr-sitemap stopped on an unexpected error: ${(error as Error).message}\n` +
-        `Nothing past this point was written. Please report it, with the command you ran:\n  https://github.com/maison-gr/sitemap/issues`;
+        `Nothing past this point was written. Please report it, with the command you ran:\n  https://github.com/maison-gr/maisongr-sitemap/issues`;
       if (recorder) return finish(2, { ok: false, error: message });
       createUi(streams.err, noColor ? { ...(streams.errStyle ?? plain), color: false } : (streams.errStyle ?? plain)).error(message);
       if (process.env.DEBUG) throw error;
