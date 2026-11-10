@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Added
+
+- `llms` warns about meta descriptions over 160 characters, which search results cut, and under 50, naming up to three pages for each.
+
 ### Changed
 
 - The repository is now `maison-gr/maisongr-sitemap`, matching the npm package. The old address redirects. The Agent Skill installs with `npx skills add maison-gr/maisongr-sitemap`; the MCP server keeps its registry name, `io.github.maison-gr/sitemap`.

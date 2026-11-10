@@ -61,9 +61,10 @@ describe("llms.txt", () => {
   async function site(): Promise<string> {
     const pages: Record<string, string> = {
       "/sitemap.xml": `<sitemapindex><sitemap><loc>${PUBLIC}/sitemap.xml?sitemap=pages</loc></sitemap></sitemapindex>`,
-      "/sitemap.xml?sitemap=pages": `<urlset>${url("/fr", pair("/fr", "/en"))}${url("/en", pair("/fr", "/en"))}${url("/fr/services", pair("/fr/services", "/en/services"))}</urlset>`,
+      "/sitemap.xml?sitemap=pages": `<urlset>${url("/fr", pair("/fr", "/en"))}${url("/en", pair("/fr", "/en"))}${url("/fr/services", pair("/fr/services", "/en/services"))}${url("/fr/prix")}</urlset>`,
       "/fr": html("Accueil | Atelier", "Un studio de design à Montréal."),
       "/fr/services": html("Services | Atelier"),
+      "/fr/prix": html("Prix | Atelier", "Nos prix. ".repeat(17)),
     };
     const server = createServer((req, res) => {
       const body = Object.entries(pages).find(([p]) => p === req.url)?.[1];
@@ -93,6 +94,9 @@ describe("llms.txt", () => {
     expect(text).toContain(`- [Services](${PUBLIC}/fr/services)`);
     expect(text).not.toContain("/en");
     expect(out).toContain("! 1 page without a meta description");
+    // Lengths are checked too, naming the pages, as search results show the same words.
+    expect(out).toContain("! 1 description over 160 characters: /fr/prix");
+    expect(out).toContain("! 1 description under 50 characters: /fr");
 
     // Written by the tool, so a later run replaces it; one written by hand is kept.
     expect((await run(["llms", "--site", PUBLIC, "--from", from], root)).out).toContain("✓ public/llms.txt");

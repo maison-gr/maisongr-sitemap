@@ -4,7 +4,7 @@ import { detect, readPackage } from "../build/detect.js";
 import { buildFramework, configuredSite } from "../build/framework-build.js";
 import { buildNext, usesCacheComponents, type BuildReport } from "../build/next-build.js";
 import { bingFile, googleFile, indexNowFile, otherSitemap, robotsWithSitemap } from "../build/connect.js";
-import { LLMS_MARK, llmsText, onePerPage, pageInfo } from "../build/llms.js";
+import { LLMS_MARK, llmsText, onePerPage, pageInfo, type PageInfo } from "../build/llms.js";
 import { buildNode, clientOf, nodePaths, servedDirs, type ModuleFormat } from "../build/node-build.js";
 import { findSite, sourceFiles } from "../build/project.js";
 import { COMMAND, withBuildStep, withStaticStep } from "../build/scripts.js";
@@ -694,6 +694,12 @@ async function runLlms() {
   if (!description) u.warn("The home page has no meta description", "llms.txt starts with it; add one to say what the site is");
   const missing = ordered.filter((p) => !p.description).length;
   if (missing) u.warn(`${plural(missing, "page")} without a meta description`, "listed by title alone");
+  // The same words show in search results, which cut them past about 160 characters.
+  const paths = (list: PageInfo[]) => list.slice(0, 3).map((p) => new URL(p.url).pathname).join(", ") + (list.length > 3 ? ", …" : "");
+  const long = ordered.filter((p) => p.description && p.description.length > 160);
+  const short = ordered.filter((p) => p.description && p.description.length < 50);
+  if (long.length) u.warn(`${plural(long.length, "description")} over 160 characters: ${paths(long)}`, "search results cut them; aim for 120 to 155");
+  if (short.length) u.warn(`${plural(short.length, "description")} under 50 characters: ${paths(short)}`, "too short to say what the page offers");
 
   const file = join(root, out!, "llms.txt");
   u.heading("Wrote");
