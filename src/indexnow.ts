@@ -35,6 +35,12 @@ export function readSitemap(xml: string): Sitemap {
   return { urls: urls.filter((u) => u.loc), parts };
 }
 
+/** The parts of an index that are on the site's own host. Engines ignore the others, and following them would fetch any address a sitemap names. */
+export const ownParts = (parts: string[], site: string) => {
+  const host = new URL(site).host;
+  return parts.filter((part) => URL.canParse(part) && new URL(part).host === host);
+};
+
 /** Addresses changed on or after `since` (YYYY-MM-DD); all of them when `since` is not given. */
 export const changedSince = (urls: Sitemap["urls"], since?: string) => urls.filter((u) => !since || (u.lastmod !== undefined && u.lastmod.slice(0, 10) >= since)).map((u) => u.loc);
 

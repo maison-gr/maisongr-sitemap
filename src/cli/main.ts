@@ -13,7 +13,7 @@ import { spaRoutes } from "../build/spa-routes.js";
 import { crawl } from "../build/crawl.js";
 import { buildStatic, siteNameOf, writeSitemapFiles } from "../build/static.js";
 import { trimSlashes } from "../entries.js";
-import { changedSince, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
+import { changedSince, ownParts, readSitemap, submit, validKey, type Sitemap } from "../indexnow.js";
 import { existingRoutes, LABEL, nodeModuleSource, RIVALS, routePath, routeSource, STATIC_OUT, type ServerKind } from "./routes.js";
 import { createRecorder, createUi, styleFor, type Report, type Style, type Ui } from "./ui.js";
 const HELP = `
@@ -714,15 +714,15 @@ async function runLlms() {
 }
 
 /** Reads a sitemap from a built file or the live site, following an index into its parts, as a crawler would. */
-async function sitemapUrls(source: string): Promise<Sitemap["urls"]> {
+async function sitemapUrls(source: string, site: string): Promise<Sitemap["urls"]> {
   const read = async (where: string) => {
     if (!/^https?:\/\//.test(where)) return readSitemap(readFileSync(join(root, where), "utf8"));
-    const res = await fetch(where);
+    const res = await fetch(where, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) fail(`${where} answered ${res.status}. Deploy first, or pass --sitemap <file>.`);
     return readSitemap(await res.text());
   };
   const first = await read(source);
-  const parts = await Promise.all(first.parts.map(read));
+  const parts = await Promise.all(ownParts(first.parts, site).map(read));
   return [...first.urls, ...parts.flatMap((p) => p.urls)];
 }
 
@@ -735,7 +735,7 @@ async function runIndexNow() {
 
   // The engines fetch the key from the site to prove the submission is the owner's.
   const keyFile = `${site}/${key}.txt`;
-  const servesKey = () => fetch(keyFile).then((r) => (r.ok ? r.text() : ""), () => "").then((t) => t.trim() === key);
+  const servesKey = () => fetch(keyFile, { signal: AbortSignal.timeout(20_000) }).then((r) => (r.ok ? r.text() : ""), () => "").then((t) => t.trim() === key);
   // --wait: right after a deploy, the new version (and its key file) may not be live yet.
   const waitFor = flag("wait") ? Number(value("wait")) || 180 : 0;
   const deadline = Date.now() + waitFor * 1000;
@@ -760,7 +760,7 @@ async function runIndexNow() {
 
   const since = flag("all") ? undefined : value("since") ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) fail("--since takes a date.\n  npx maisongr-sitemap indexnow --since 2026-11-01");
-  const urls = changedSince(await sitemapUrls(value("sitemap") ?? `${site}/sitemap.xml`), since);
+  const urls = changedSince(await sitemapUrls(value("sitemap") ?? `${site}/sitemap.xml`, site!), since);
   if (!urls.length) {
     u.ok(`No page ${since ? `changed since ${since}` : "in the sitemap"}`, since ? "pages without a lastmod are sent only with --all" : undefined);
     return;
