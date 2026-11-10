@@ -2,7 +2,7 @@ import { dateOf, expand, linkFolders, matches, trimSlashes, type DateLike, type 
 import { DEFAULT_PALETTE } from "./build/palette.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
-import { indexXml, MAX_URLS, newest, urlsetXml } from "./xml.js";
+import { chunk, indexXml, newest, urlsetXml } from "./xml.js";
 
 export type SitemapOptions = {
   /**
@@ -61,6 +61,24 @@ function respond(body: string, type: string, headers: Record<string, string> = {
   return new Response(body, { headers: { "Content-Type": `${type}; charset=utf-8`, ...headers } });
 }
 
+/** A strong ETag from the body: the same list, the same tag, whatever the dates say. */
+async function etagOf(body: string): Promise<string> {
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
+  return `"${[...hash.slice(0, 16)].map((b) => b.toString(16).padStart(2, "0")).join("")}"`;
+}
+
+/** If-None-Match names this tag (or "*"). Weak comparison, as for every GET: a proxy may have marked it W/. */
+const unchanged = (ifNoneMatch: string | null, tag: string) =>
+  !!ifNoneMatch && ifNoneMatch.split(",").some((t) => t.trim() === "*" || t.trim().replace(/^W\//, "") === tag);
+
+/**
+ * A person opening the address, not a crawler. A browser that opens a page sends
+ * both `Sec-Fetch-Dest: document` and an Accept that asks for HTML; requiring
+ * both keeps the XML for any fetcher built on a browser engine that sends only
+ * the first. No user agent is read: everyone gets what they asked for.
+ */
+const isBrowser = (headers: Headers) => headers.get("sec-fetch-dest") === "document" && /\btext\/html\b/i.test(headers.get("accept") ?? "");
+
 function mergeTheme(base: Theme, over: SitemapOptions["theme"]): Theme {
   if (!over) return base;
   return {
@@ -89,10 +107,10 @@ const hostOf = (site: string) => new URL(site).hostname.replace(/^www\./, "");
 
 /**
  * One address, two readers. A browser opening the sitemap announces a page
- * visit with `Sec-Fetch-Dest: document` and gets the designed page; crawlers
- * never send it and get the XML. Both list exactly the same addresses (one
- * file presented two ways, not cloaking); the page is noindex, and Vary keeps
- * any cache from handing one to the other.
+ * visit with `Sec-Fetch-Dest: document` and asks for HTML, and gets the
+ * designed page; crawlers send neither and get the XML. Both list exactly the
+ * same addresses (one file presented two ways, not cloaking); the page is
+ * noindex and private, and Vary keeps any cache from handing one to the other.
  */
 export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
   const manifest = asManifest(options.manifest);
@@ -171,11 +189,12 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
     return cache.groups;
   };
 
-  /** A sitemap in files of at most 50,000 addresses. */
+  /** A sitemap in files within the protocol's limits, worked out once per loaded list. */
+  const chunked = new WeakMap<Entry[], Entry[][]>();
   const chunksOf = (entries: Entry[]) => {
-    const chunks: Entry[][] = [];
-    for (let i = 0; i < entries.length; i += MAX_URLS) chunks.push(entries.slice(i, i + MAX_URLS));
-    return chunks.length ? chunks : [[]];
+    let chunks = chunked.get(entries);
+    if (!chunks) chunked.set(entries, (chunks = chunk(entries)));
+    return chunks;
   };
 
   async function GET(request: Request): Promise<Response> {
@@ -197,17 +216,34 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
       stale = true;
     }
     const named = theme.name ? theme : { ...theme, name: hostOf(site) };
-    const browser = request.headers.get("sec-fetch-dest") === "document";
+    const browser = isBrowser(request.headers);
     const self = `${url.pathname}?asset=xml.css`;
     // A stale answer is cached briefly, so the next request soon tries the source again.
-    const freshness: Record<string, string> = stale ? { "Cache-Control": "public, max-age=60", "X-Sitemap-Stale": "true" } : { "Cache-Control": "public, max-age=3600" };
-    const pageHeaders = { ...VARY, "X-Robots-Tag": "noindex", ...freshness };
-    const xmlHeaders = { ...VARY, ...freshness };
+    const age = stale ? 60 : 3600;
+    const marked: Record<string, string> = stale ? { "X-Sitemap-Stale": "true" } : {};
+    // The page is private: a shared cache that ignores Vary (some CDNs do) must never store it and
+    // hand it to a crawler as the sitemap. The XML is the same for everyone, so caches may keep it.
+    const pageHeaders = { ...VARY, "X-Robots-Tag": "noindex", "Cache-Control": `private, max-age=${age}`, ...marked };
+    const xmlHeaders = { ...VARY, "Cache-Control": `public, max-age=${age}`, ...marked };
     const notFound = () => new Response("Not found", { status: 404, headers: VARY });
+    // Answers "has it changed?" with 304 when the ETag still matches, so a crawler skips an unchanged
+    // file. Only the ETag decides: a date alone would miss an address that was taken out.
+    const answer = async (body: string, type: string, headers: Record<string, string>, lastmod?: string) => {
+      const tag = await etagOf(body);
+      const all: Record<string, string> = { ...headers, ETag: tag };
+      if (lastmod && !Number.isNaN(Date.parse(lastmod))) all["Last-Modified"] = new Date(lastmod).toUTCString();
+      return unchanged(request.headers.get("if-none-match"), tag) ? new Response(null, { status: 304, headers: all }) : respond(body, type, all);
+    };
     const urlset = (entries: Entry[]) =>
-      browser ? respond(urlsetPage(entries, named, page), "text/html", pageHeaders) : respond(urlsetXml(entries, self), "application/xml", xmlHeaders);
-    const index = (parts: { loc: string; lastmod?: string; count: number; label?: string }[]) =>
-      browser ? respond(indexPage(parts, named, page), "text/html", pageHeaders) : respond(indexXml(parts, self), "application/xml", xmlHeaders);
+      browser
+        ? answer(urlsetPage(entries, named, page), "text/html", pageHeaders, newest(entries))
+        : answer(urlsetXml(entries, self), "application/xml", xmlHeaders, newest(entries));
+    const index = (parts: { loc: string; lastmod?: string; count: number; label?: string }[]) => {
+      const lastmod = parts.reduce<string | undefined>((max, p) => (p.lastmod && (!max || p.lastmod > max) ? p.lastmod : max), undefined);
+      return browser
+        ? answer(indexPage(parts, named, page), "text/html", pageHeaders, lastmod)
+        : answer(indexXml(parts, self), "application/xml", xmlHeaders, lastmod);
+    };
 
     const name = url.searchParams.get("sitemap");
     const part = Number(url.searchParams.get("part") ?? 0);

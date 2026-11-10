@@ -59,6 +59,69 @@ function sectionsOf(entries: Entry[]): Map<string, Entry[]> {
 
 const titleOf = (section: string, t: Strings) => (section ? `/${decodeURIComponent(section)}/` : t.pagesSection);
 
+/** Above this many rows the page gets its filter and sort; below, the list reads faster on its own. */
+const TOOLS_FROM = 10;
+
+/** One page as a row: its version in the page's language first, and its other language versions. */
+type Row = { main: Entry; versions: Entry[] };
+
+const primary = (lang: string | undefined) => (lang ?? "").toLowerCase().split(/[-_]/)[0];
+
+/**
+ * Language versions of one page share a row: entries whose alternates name each
+ * other, one per language. The row shows the version in the page's language (or
+ * the first one) and links the others beside it, so every address is still
+ * listed exactly once. An entry without a language is a row of its own.
+ */
+function rowsOf(entries: Entry[], lang: string | undefined): Row[] {
+  const index = new Map(entries.map((e, i) => [e.loc, i]));
+  const root = entries.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i]!)));
+  entries.forEach((e, i) => {
+    if (!e.lang) return;
+    for (const a of e.alternates ?? []) {
+      const j = index.get(a.href);
+      if (j !== undefined && j !== i && entries[j]!.lang) root[find(j)] = find(i);
+    }
+  });
+  const rows: Row[] = [];
+  const open = new Map<number, Row>();
+  entries.forEach((e, i) => {
+    const row = open.get(find(i));
+    // Two entries in the same language can't share a row: the second gets its own.
+    if (row && e.lang && !row.versions.some((v) => v.lang === e.lang)) return void row.versions.push(e);
+    const fresh = { main: e, versions: [e] };
+    rows.push(fresh);
+    if (!row) open.set(find(i), fresh);
+  });
+  const own = primary(lang);
+  for (const row of rows) row.main = row.versions.find((v) => primary(v.lang) === own) ?? row.versions[0]!;
+  return rows;
+}
+
+const latest = (entries: Entry[]) => entries.reduce<string | undefined>((max, e) => (e.lastmod && (!max || e.lastmod > max) ? e.lastmod : max), undefined);
+
+function rowHtml(row: Row, n: number, width: number): string {
+  const path = pathOf(row.main.loc);
+  const date = latest(row.versions);
+  const search = row.versions.map((v) => pathOf(v.loc).toLowerCase()).join(" ");
+  const langs = row.versions.flatMap((v) => (v.lang ? [v.lang] : [])).join(" ");
+  // Every version, for the page's script: picking a language in the filter shows each row's version in it.
+  const versions = row.versions.length > 1 ? ` data-v="${esc(JSON.stringify(row.versions.map((v) => [v.lang, pathOf(v.loc)])))}"` : "";
+  const tags = row.versions
+    .filter((v) => v.lang)
+    .map((v) =>
+      v === row.main
+        ? `<span class="lang is-current">${esc(v.lang!.toUpperCase())}</span>`
+        : `<a class="lang" href="${esc(pathOf(v.loc))}" hreflang="${esc(v.lang!)}">${esc(v.lang!.toUpperCase())}</a>`,
+    )
+    .join("");
+  // Many languages take their own line on a phone; two or three fit beside the address.
+  return `<li class="row${row.versions.length > 3 ? " many" : ""}" data-u="${esc(search)}"${langs ? ` data-l="${esc(langs)}"` : ""}${date ? ` data-d="${esc(date)}"` : ""}${versions}>
+<span class="num">${pad(n, width)}</span><a class="url" href="${esc(path)}"${row.main.lang ? ` hreflang="${esc(row.main.lang)}"` : ""}>${esc(path)}</a><span class="langs">${tags}</span><span class="date">${date ? esc(date) : ""}</span>
+</li>`;
+}
+
 /** The newest of a list's dates, as a Date, or undefined when none is valid. */
 function newestDate(dates: (string | undefined)[]): Date | undefined {
   const times = dates.map((d) => (d ? Date.parse(d) : NaN)).filter((n) => !Number.isNaN(n));
@@ -98,29 +161,25 @@ ${body}
 export function urlsetPage(entries: Entry[], theme: Theme, options: PageOptions = {}): string {
   const t = stringsFor(options.lang);
   const langs = [...new Set(entries.map((e) => e.lang).filter((l): l is string => !!l))];
-  const width = String(entries.length).length < 2 ? 2 : String(entries.length).length;
+  const rows = rowsOf(entries, options.lang);
+  const width = Math.max(2, String(rows.length).length);
+  const rowOf = new Map(rows.map((r) => [r.main, r]));
 
-  const sections = sectionsOf(entries);
+  const sections = sectionsOf(rows.map((r) => r.main));
 
   let n = 0;
-  const groups = [...sections].map(([key, rows], i) => {
+  const groups = [...sections].map(([key, mains], i) => {
     const id = `s-${i}`;
-    const items = rows
-      .map((e) => {
-        n += 1;
-        const path = pathOf(e.loc);
-        return `<li class="row" data-u="${esc(path.toLowerCase())}"${e.lang ? ` data-l="${esc(e.lang)}"` : ""}>
-<span class="num">${pad(n, width)}</span><a class="url" href="${esc(path)}">${esc(path)}</a>${e.lang ? `<span class="lang">${esc(e.lang.toUpperCase())}</span>` : "<span></span>"}<span class="date">${e.lastmod ? esc(e.lastmod) : ""}</span>
-</li>`;
-      })
-      .join("\n");
-    return `<section class="group" id="${id}" aria-labelledby="${id}-h"><header class="group-head"><h2 id="${id}-h">${esc(titleOf(key, t))}</h2><span class="count">${rows.length}</span></header>
+    const items = mains.map((m) => rowHtml(rowOf.get(m)!, ++n, width)).join("\n");
+    return `<section class="group" id="${id}" aria-labelledby="${id}-h"><header class="group-head"><h2 id="${id}-h">${esc(titleOf(key, t))}</h2><span class="count">${mains.length}</span></header>
 <ol class="rows">
 ${items}
 </ol></section>`;
   });
 
   const counts = langs.map((l) => `<span><b>${entries.filter((e) => e.lang === l).length}</b> ${esc(l.toUpperCase())}</span>`).join("");
+  // When language versions share rows, the addresses are counted too: they are what the XML lists.
+  const addresses = rows.length < entries.length ? `<span><b>${entries.length}</b> ${esc(t.addresses(entries.length))}</span>` : "";
   const chips = langs.length > 1
     ? `<div class="chips" role="group" aria-label="${esc(t.languageGroup)}"><button type="button" class="chip" data-f="" aria-pressed="true">${esc(t.all)}</button>${langs.map((l) => `<button type="button" class="chip" data-f="${esc(l)}" aria-pressed="false">${esc(l.toUpperCase())}</button>`).join("")}</div>`
     : "";
@@ -131,16 +190,23 @@ ${items}
     return shell(theme, t.title, `${heading}\n<p class="empty">${esc(t.empty)}</p>`, options);
   }
 
+  const tools = rows.length > TOOLS_FROM;
+  const sort = tools && rows.filter((r) => latest(r.versions)).length > 1;
   const body = `${heading}
-<p class="facts"><span><b>${entries.length}</b> ${esc(t.pages(entries.length))}</span>${counts}</p>
-<div class="tools">
+<p class="facts"><span><b>${rows.length}</b> ${esc(t.pages(rows.length))}</span>${addresses}${counts}</p>
+${
+  tools
+    ? `<div class="tools">
 <input id="q" class="search" type="search" placeholder="${esc(t.filterPlaceholder)}" aria-label="${esc(t.filterLabel)}" autocomplete="off" spellcheck="false">
-${chips}
+${chips}${sort ? `<button type="button" class="chip sort" id="recent" aria-pressed="false">${esc(t.recent)}</button>` : ""}
 <p class="tally" id="tally" aria-live="polite" data-t="${esc(t.tally)}"></p>
-</div>
-${sections.size > 1 && sections.size <= 12 ? `<nav class="jump" aria-label="${esc(t.sectionsNav)}">${[...sections].map(([key, rows], i) => `<a href="#s-${i}">${esc(titleOf(key, t))} <span>${rows.length}</span></a>`).join("")}</nav>` : ""}
+</div>`
+    : ""
+}
+${sections.size > 1 && sections.size <= 12 ? `<nav class="jump" aria-label="${esc(t.sectionsNav)}">${[...sections].map(([key, mains], i) => `<a href="#s-${i}">${esc(titleOf(key, t))} <span>${mains.length}</span></a>`).join("")}</nav>` : ""}
 ${groups.join("\n")}
-<p class="empty" id="empty" hidden>${esc(t.noMatch)}</p>`;
+${sort ? `<section class="group" id="recent-list" aria-labelledby="recent-h" hidden><header class="group-head"><h2 id="recent-h">${esc(t.recent)}</h2></header><ol class="rows"></ol></section>` : ""}
+${tools ? `<p class="empty" id="empty" hidden>${esc(t.noMatch)}</p>` : ""}`;
 
   return shell(theme, t.title, body, options, newestDate(entries.map((e) => e.lastmod)));
 }
@@ -249,35 +315,81 @@ h2{min-width:0;overflow-wrap:anywhere;font:600 clamp(1.5rem,3.5vw,2.25rem)/1.1 v
 .url{display:block;min-width:0;min-height:44px;padding:.625rem 0;overflow-wrap:anywhere;text-decoration:none;font-size:.9375rem;line-height:1.5;text-underline-offset:.25em}
 .url:hover{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px}
 .lang{font:500 .6875rem/1 var(--mono);letter-spacing:.06em;padding:.25rem .5rem;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+.langs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.375rem;max-width:16rem}
+a.lang{position:relative;color:var(--fg);text-decoration:none}
+a.lang:hover{border-color:var(--fg)}
+a.lang::after{content:"";position:absolute;inset:-12px -2px}
+#recent-list .num{visibility:hidden}
 .empty{margin-top:clamp(2rem,5vw,3rem);max-width:44ch;color:var(--muted)}
 .foot{margin-top:4rem;padding-top:1.25rem;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem 1.5rem;font:400 .75rem/1.5 var(--mono);color:var(--muted)}
 .foot p{margin:0}
 .about span+span::before{content:" · "}
 .foot a{color:var(--fg);text-underline-offset:.2em;white-space:nowrap}
 .foot a:hover{color:var(--accent)}
-@media (max-width:40rem){.row{grid-template-columns:2.5rem minmax(0,1fr) auto}.date{display:none}}
-@media (prefers-reduced-motion:no-preference){.url,.chip,.jump a{transition:color .15s,border-color .15s,background-color .15s}}
+@media (max-width:40rem){.row{grid-template-columns:2.5rem minmax(0,1fr) auto}.row.many .langs{grid-column:2/-1;justify-content:flex-start;max-width:none;padding-bottom:.75rem}.date{display:none}}
+@media (prefers-reduced-motion:no-preference){.url,.chip,.jump a,a.lang{transition:color .15s,border-color .15s,background-color .15s}}
 `;
 }
 
-/** Served as ?asset=page.js. Filters by path and language; keeps the count live. */
+/**
+ * Served as ?asset=page.js. Filters by path and language, shows each row's
+ * version in the language picked, lists the pages newest first on demand, and
+ * keeps the count live.
+ */
 export const PAGE_JS = `(function () {
   var q = document.getElementById("q");
   if (!q) return;
   var rows = [].slice.call(document.querySelectorAll(".row[data-u]"));
+  var homes = rows.map(function (r) { return r.parentNode; });
   var groups = [].slice.call(document.querySelectorAll(".group"));
-  var chips = [].slice.call(document.querySelectorAll(".chip"));
+  var chips = [].slice.call(document.querySelectorAll(".chip[data-f]"));
+  var sort = document.getElementById("recent");
+  var list = document.getElementById("recent-list");
+  var jump = document.querySelector(".jump");
   var tally = document.getElementById("tally");
   var empty = document.getElementById("empty");
-  var lang = "";
+  var lang = "", recent = false;
+  function show(r) {
+    var data = r.getAttribute("data-v");
+    if (!data) return;
+    var versions = JSON.parse(data), url = r.querySelector(".url"), langs = r.querySelector(".langs"), pick = null;
+    if (!r.own) r.own = [url.getAttribute("hreflang"), url.getAttribute("href")];
+    versions.forEach(function (v) { if (v[0] === lang) pick = v; });
+    pick = pick || r.own;
+    if (url.getAttribute("href") === pick[1]) return;
+    url.setAttribute("href", pick[1]);
+    url.setAttribute("hreflang", pick[0]);
+    url.textContent = pick[1];
+    langs.textContent = "";
+    versions.forEach(function (v) {
+      var current = v[1] === pick[1], tag = document.createElement(current ? "span" : "a");
+      tag.className = current ? "lang is-current" : "lang";
+      if (!current) { tag.setAttribute("href", v[1]); tag.setAttribute("hreflang", v[0]); }
+      tag.textContent = v[0].toUpperCase();
+      langs.appendChild(tag);
+    });
+  }
+  function order() {
+    if (recent) {
+      var target = list.querySelector(".rows");
+      rows.slice().sort(function (a, b) {
+        var x = a.getAttribute("data-d") || "", y = b.getAttribute("data-d") || "";
+        return x < y ? 1 : x > y ? -1 : 0;
+      }).forEach(function (r) { target.appendChild(r); });
+    } else {
+      rows.forEach(function (r, i) { homes[i].appendChild(r); });
+    }
+  }
   function apply() {
     var term = q.value.trim().toLowerCase(), shown = 0;
     rows.forEach(function (r) {
-      var ok = (!term || r.getAttribute("data-u").indexOf(term) !== -1) && (!lang || r.getAttribute("data-l") === lang);
+      var ok = (!term || r.getAttribute("data-u").indexOf(term) !== -1) && (!lang || (" " + (r.getAttribute("data-l") || "") + " ").indexOf(" " + lang + " ") !== -1);
       r.hidden = !ok;
       if (ok) shown++;
+      show(r);
     });
-    groups.forEach(function (g) { g.hidden = !g.querySelector(".row:not([hidden])"); });
+    groups.forEach(function (g) { g.hidden = (g === list) !== recent || !g.querySelector(".row:not([hidden])"); });
+    if (jump) jump.hidden = recent;
     tally.textContent = term || lang ? (tally.getAttribute("data-t") || "{shown} of {total} pages").replace("{shown}", shown).replace("{total}", rows.length) : "";
     empty.hidden = shown !== 0;
   }
@@ -289,5 +401,13 @@ export const PAGE_JS = `(function () {
       apply();
     });
   });
+  if (sort) {
+    sort.addEventListener("click", function () {
+      recent = !recent;
+      sort.setAttribute("aria-pressed", recent ? "true" : "false");
+      order();
+      apply();
+    });
+  }
 })();
 `;

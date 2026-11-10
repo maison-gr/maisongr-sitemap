@@ -3,6 +3,9 @@ import type { Entry, News, Video } from "./types.js";
 /** The protocol's limit per file; above it the sitemap becomes an index of parts. */
 export const MAX_URLS = 50_000;
 
+/** The protocol's other limit: 50 MB of XML per file, before compression. */
+export const MAX_BYTES = 50 * 1024 * 1024;
+
 /** Google reads at most this many images per page. */
 const MAX_IMAGES = 1_000;
 
@@ -49,29 +52,58 @@ const head = (stylesheet?: string) =>
   `<?xml version="1.0" encoding="UTF-8"?>\n` +
   (stylesheet ? `<?xml-stylesheet type="text/css" href="${escapeXml(stylesheet)}"?>\n` : "");
 
+function urlXml(e: Entry): string {
+  const lines = [`    <loc>${escapeXml(e.loc)}</loc>`];
+  for (const a of e.alternates ?? []) {
+    lines.push(`    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}"/>`);
+  }
+  if (e.lastmod) lines.push(`    <lastmod>${escapeXml(e.lastmod)}</lastmod>`);
+  for (const image of [...new Set(e.images ?? [])].slice(0, MAX_IMAGES)) {
+    lines.push(`    <image:image><image:loc>${escapeXml(new URL(image, e.loc).href)}</image:loc></image:image>`);
+  }
+  for (const v of e.videos ?? []) {
+    const video = videoXml(v, e.loc);
+    if (video) lines.push(`    ${video}`);
+  }
+  const news = e.news ? newsXml(e.news) : null;
+  if (news) lines.push(`    ${news}`);
+  return `  <url>\n${lines.join("\n")}\n  </url>`;
+}
+
+const utf8 = new TextEncoder();
+
+/**
+ * A sitemap split into files within both of the protocol's limits: at most
+ * `maxUrls` addresses and `maxBytes` of XML each. Language versions and images
+ * make an address long, so a multilingual site can reach 50 MB well before
+ * 50,000 addresses. 1 KB per file is kept for its head and namespaces.
+ */
+export function chunk(entries: Entry[], maxUrls = MAX_URLS, maxBytes = MAX_BYTES): Entry[][] {
+  const room = maxBytes - 1024;
+  const chunks: Entry[][] = [];
+  let current: Entry[] = [];
+  let size = 0;
+  for (const e of entries) {
+    const bytes = utf8.encode(urlXml(e)).length + 1;
+    if (current.length && (current.length === maxUrls || size + bytes > room)) {
+      chunks.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(e);
+    size += bytes;
+  }
+  if (current.length || !chunks.length) chunks.push(current);
+  return chunks;
+}
+
 export function urlsetXml(entries: Entry[], stylesheet?: string): string {
-  const urls = entries.map((e) => {
-    const lines = [`    <loc>${escapeXml(e.loc)}</loc>`];
-    for (const a of e.alternates ?? []) {
-      lines.push(`    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}"/>`);
-    }
-    if (e.lastmod) lines.push(`    <lastmod>${escapeXml(e.lastmod)}</lastmod>`);
-    for (const image of [...new Set(e.images ?? [])].slice(0, MAX_IMAGES)) {
-      lines.push(`    <image:image><image:loc>${escapeXml(new URL(image, e.loc).href)}</image:loc></image:image>`);
-    }
-    for (const v of e.videos ?? []) {
-      const video = videoXml(v, e.loc);
-      if (video) lines.push(`    ${video}`);
-    }
-    const news = e.news ? newsXml(e.news) : null;
-    if (news) lines.push(`    ${news}`);
-    return `  <url>\n${lines.join("\n")}\n  </url>`;
-  });
+  const urls = entries.map(urlXml);
   const body = urls.join("\n");
   // Only the namespaces the file uses.
   const used = (Object.keys(NS) as (keyof typeof NS)[]).filter((k) => body.includes(`<${k}:`)).map((k) => NS[k]);
   const ns = [`xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"`, ...used].join(" ");
-  return `${head(stylesheet)}<urlset ${ns}>\n${urls.join("\n")}\n</urlset>\n`;
+  return `${head(stylesheet)}<urlset ${ns}>\n${body}\n</urlset>\n`;
 }
 
 export function indexXml(parts: { loc: string; lastmod?: string }[], stylesheet?: string): string {

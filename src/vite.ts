@@ -89,8 +89,8 @@ export function sitemap(options: ViteSitemapOptions) {
           res.end();
           return;
         }
-        // Two readers: a browser opening /sitemap.xml gets the page, a crawler the XML.
-        const browser = req.headers["sec-fetch-dest"] === "document";
+        // Two readers: a browser opening /sitemap.xml gets the page, a crawler the XML (as in the handler).
+        const browser = req.headers["sec-fetch-dest"] === "document" && /\btext\/html\b/i.test(String(req.headers.accept ?? ""));
         const file = path === "sitemap.xml" && browser ? "sitemap/index.html" : path;
         if (file !== "sitemap.xml" && file !== "sitemap.css" && !file.startsWith("sitemap/")) return next();
         let body: string | undefined;

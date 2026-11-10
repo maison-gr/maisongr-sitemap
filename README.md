@@ -1,6 +1,6 @@
 # maisongr-sitemap
 
-**One sitemap, two readers.** Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode, with every address as a link and a filter.
+**One sitemap, two readers.** Search engines get the XML they need. A person who opens `/sitemap.xml` gets a page in your site's own colours, fonts and dark mode: every address as a link, one row per page with its language versions side by side, and on a longer list a filter and a newest-first sort.
 
 [![npm version](https://img.shields.io/npm/v/maisongr-sitemap?color=1b1a17)](https://www.npmjs.com/package/maisongr-sitemap)
 [![CI](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml/badge.svg)](https://github.com/maison-gr/sitemap/actions/workflows/ci.yml)
@@ -146,7 +146,7 @@ Astro, SvelteKit and Nuxt routes call `createSitemap` from `maisongr-sitemap` wi
 
 A `lastmod` can be a `YYYY-MM-DD` string, an ISO timestamp, a `Date` or milliseconds. One that isn't a real date is left out, because an invalid date makes Search Console reject the whole file.
 
-Past 50,000 addresses, the sitemap becomes a sitemap index of `?part=N` files.
+Past 50,000 addresses or 50 MB of XML, the protocol's two limits per file, the sitemap becomes a sitemap index of `?part=N` files. A multilingual site with images can reach 50 MB first.
 
 There is no `changefreq` or `priority`: Google says it ignores both.
 
@@ -168,7 +168,7 @@ sitemap({
 - `?sitemap=pages`, for the routes and `entries`;
 - then `?sitemap=companies` and `?sitemap=jobs`.
 
-Each one still splits into parts past 50,000 addresses. An address is listed once, in the first sitemap that has it. Opened in a browser, the index is a page that links to each sitemap.
+Each one still splits into parts past 50,000 addresses or 50 MB. An address is listed once, in the first sitemap that has it. Opened in a browser, the index is a page that links to each sitemap.
 
 ## Images, videos and news
 
@@ -257,10 +257,12 @@ export const loader = ({ request }) => sitemap(request);
 
 ## How it serves two readers
 
-A browser opening a page sends `Sec-Fetch-Dest: document`; crawlers never do. That request gets the designed page; every other request gets the XML.
+A browser opening a page sends `Sec-Fetch-Dest: document` and an `Accept` that asks for HTML; crawlers send neither. That request gets the designed page; every other request gets the XML. Requiring both keeps the XML for a fetcher built on a browser engine that sends only the first, and no user agent is read.
 
 - Both list exactly the same addresses. It's one file presented two ways, not cloaking.
-- The page is `X-Robots-Tag: noindex`, and both carry `Vary: Sec-Fetch-Dest`, so no cache mixes them up.
+- The page is `X-Robots-Tag: noindex` and `Cache-Control: private`, so a shared cache never stores it, even one that ignores `Vary` (some CDNs do) and could otherwise hand it to a crawler. The XML is the same for everyone, so caches may keep it.
+- Both carry `Vary: Sec-Fetch-Dest`, so no cache that follows it mixes them up.
+- Each answer has an `ETag`, and a request whose `If-None-Match` still matches gets `304 Not Modified`, so a crawler skips an unchanged sitemap. Only the tag decides: a date alone would miss an address that was taken out.
 - The XML keeps an `<?xml-stylesheet?>` with plain CSS for browsers that don't send the header.
 
 **It works under a strict Content-Security-Policy.** The page has no inline script or style: both load from the sitemap's own address (`?asset=page.css`, `?asset=page.js`), and the fonts load from your own domain. `default-src 'self'` allows all of it, with no hashes or nonces to maintain.
@@ -324,7 +326,7 @@ The page carries `<meta name="robots" content="noindex">`, so `/sitemap/` is nev
 
 ```sh
 curl -sI https://www.example.com/sitemap.xml                              # application/xml
-curl -sI -H "Sec-Fetch-Dest: document" https://www.example.com/sitemap.xml # text/html
+curl -sI -H "Sec-Fetch-Dest: document" -H "Accept: text/html" https://www.example.com/sitemap.xml # text/html
 ```
 
 `vite dev` with the plugin below answers the same way, `/sitemap/` redirect included, so what you test locally is what the rules serve. It's off by default, so icons and tracking pixels aren't listed unless you ask for them.
@@ -416,7 +418,7 @@ npx skills add maison-gr/sitemap
 {
   "ok": true,
   "command": "init",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "subject": "Next.js 16 · App Router",
   "sections": [{ "heading": "Wrote", "items": [{ "status": "ok", "text": "app/sitemap.xml/route.ts" }] }],
   "warnings": 0

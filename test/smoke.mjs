@@ -13,7 +13,7 @@ const xml = await (await handler(new Request("https://www.example.com/sitemap.xm
 assert.match(xml, /<loc>https:\/\/www\.example\.com\/about<\/loc>/);
 assert.match(xml, /<lastmod>2026-10-01<\/lastmod>/);
 
-const page = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { "Sec-Fetch-Dest": "document" } }));
+const page = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { "Sec-Fetch-Dest": "document", Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" } }));
 assert.equal(page.headers.get("x-robots-tag"), "noindex");
 
 const server = createServer(nodeSitemap({ site: "https://www.example.com", entries }));

@@ -9,6 +9,8 @@ export type Strings = {
   indexTitle: string;
   heading: (name: string) => string;
   pages: (n: number) => string;
+  /** Addresses, counted apart from pages when a page has several language versions. */
+  addresses: (n: number) => string;
   files: (n: number) => string;
   pagesSection: string;
   filesSection: string;
@@ -16,6 +18,8 @@ export type Strings = {
   filterLabel: string;
   languageGroup: string;
   all: string;
+  /** The button that lists every page by its last change, newest first. */
+  recent: string;
   sectionsNav: string;
   noMatch: string;
   empty: string;
@@ -38,6 +42,7 @@ const en: Strings = {
   indexTitle: "Sitemap index",
   heading: (name) => `Every page on ${name}`,
   pages: (n) => (n === 1 ? "page" : "pages"),
+  addresses: (n) => (n === 1 ? "address" : "addresses"),
   files: (n) => (n === 1 ? "file" : "files"),
   pagesSection: "Pages",
   filesSection: "Files",
@@ -45,6 +50,7 @@ const en: Strings = {
   filterLabel: "Filter pages by path",
   languageGroup: "Language",
   all: "All",
+  recent: "Recently updated",
   sectionsNav: "Sections",
   noMatch: "No page matches this filter.",
   empty: "No pages are listed yet. They appear here, and in the XML, once the site publishes them.",
@@ -65,6 +71,7 @@ const fr: Strings = {
   heading: (name) => `Toutes les pages ${/^[aeiouyàâäéèêëîïôöùûüæœ]/i.test(name) ? "d’" : "de "}${name}`,
   // French takes the singular for 0 and 1.
   pages: (n) => (n < 2 ? "page" : "pages"),
+  addresses: (n) => (n < 2 ? "adresse" : "adresses"),
   files: (n) => (n < 2 ? "fichier" : "fichiers"),
   pagesSection: "Pages",
   filesSection: "Fichiers",
@@ -72,6 +79,7 @@ const fr: Strings = {
   filterLabel: "Filtrer les pages par adresse",
   languageGroup: "Langue",
   all: "Toutes",
+  recent: "Mises à jour récentes",
   sectionsNav: "Sections",
   noMatch: "Aucune page ne correspond à ce filtre.",
   empty: "Aucune page n’est encore listée. Elles apparaîtront ici, et dans le XML, dès que le site les publiera.",

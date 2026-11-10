@@ -64,7 +64,7 @@ Start the site, then check both readers:
 
 ```sh
 curl -sI http://localhost:3000/sitemap.xml                               # application/xml
-curl -sI -H "Sec-Fetch-Dest: document" http://localhost:3000/sitemap.xml # text/html
+curl -sI -H "Sec-Fetch-Dest: document" -H "Accept: text/html" http://localhost:3000/sitemap.xml # text/html
 ```
 
 On a static host both answers are XML until the host has its rewrite rule. The README's "One address on a static host" gives the rule for Cloudflare and Vercel. The page is at `/sitemap/` either way.

@@ -25,7 +25,7 @@ describe("the Node adapter", () => {
     expect(xml.headers.get("content-type")).toBe("application/xml; charset=utf-8");
     expect(xml.headers.get("vary")).toBe("Sec-Fetch-Dest");
     expect(await xml.text()).toContain("<loc>https://www.example.com/about</loc>");
-    const page = await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document" } });
+    const page = await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document", Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" } });
     expect(page.headers.get("x-robots-tag")).toBe("noindex");
     expect(await page.text()).toContain('<a class="url" href="/about">/about</a>');
     const css = await fetch(`${base}/sitemap.xml?asset=page.css`);

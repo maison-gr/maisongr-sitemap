@@ -59,7 +59,7 @@ describe("the Vite plugin", () => {
     expect(body).not.toContain("*");
     expect(body).toContain('href="/sitemap.css"');
 
-    const html = await (await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document" } })).text();
+    const html = await (await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document", Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" } })).text();
     expect(html).toContain('<html lang="fr"');
     expect(html).toContain('href="/services"');
     // Each page counted in index.html's language, as the prerendered build counts it.
@@ -71,7 +71,7 @@ describe("the Vite plugin", () => {
 
   it("answers one address two ways: a browser opening /sitemap.xml gets the page, a crawler the XML", async () => {
     const base = await devServer(project(SPA), sitemap({ site: "https://aquadrill.example" }));
-    const person = await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document" } });
+    const person = await fetch(`${base}/sitemap.xml`, { headers: { "Sec-Fetch-Dest": "document", Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" } });
     expect(person.headers.get("content-type")).toBe("text/html; charset=utf-8");
     expect(person.headers.get("x-robots-tag")).toBe("noindex");
     expect(person.headers.get("vary")).toBe("Sec-Fetch-Dest");

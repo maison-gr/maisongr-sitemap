@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { expand } from "../src/entries.js";
-import { urlsetXml } from "../src/xml.js";
+import { chunk, MAX_BYTES, MAX_URLS, urlsetXml } from "../src/xml.js";
 
 const page = "https://www.example.com/journal/tides";
 
@@ -56,5 +56,34 @@ describe("image, video and news sitemaps", () => {
       params: { "/[locale]/blog/[slug]": () => [{ slug: "tides", images: ["/covers/tides.jpg"] }] },
     });
     expect(out.map((e) => e.images)).toEqual([["/covers/tides.jpg"], ["/covers/tides.jpg"]]);
+  });
+});
+
+describe("the protocol's limits per file", () => {
+  // A page in ten languages, each version naming the ten: about 1 KB of XML per address.
+  const langs = ["en", "fr", "ar", "es", "pt", "de", "it", "nl", "ja", "zh-CN"];
+  const entries = Array.from({ length: 400 }, (_, i) => ({
+    loc: `https://www.example.com/en/p/${i}`,
+    lastmod: "2026-11-09",
+    alternates: langs.map((l) => ({ hreflang: l, href: `https://www.example.com/${l}/p/${i}` })),
+  }));
+  const bytes = (s: string) => new TextEncoder().encode(s).length;
+
+  it("are 50,000 addresses and 50 MB, as the protocol and Google set them", () => {
+    expect(MAX_URLS).toBe(50_000);
+    expect(MAX_BYTES).toBe(52_428_800);
+  });
+
+  it("splits by size as well as by count, every file within the limit, nothing lost or reordered", () => {
+    const limit = 100_000;
+    const parts = chunk(entries, MAX_URLS, limit);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const part of parts) expect(bytes(urlsetXml(part, "/sitemap.xml?asset=xml.css"))).toBeLessThanOrEqual(limit);
+    expect(parts.flat()).toEqual(entries);
+  });
+
+  it("still splits by count when the files are small", () => {
+    expect(chunk(entries, 150).map((p) => p.length)).toEqual([150, 150, 100]);
+    expect(chunk([])).toEqual([[]]);
   });
 });

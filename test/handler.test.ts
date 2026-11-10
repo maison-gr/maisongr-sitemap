@@ -23,8 +23,14 @@ const manifest: Manifest = {
   },
 };
 
+/** What a browser sends when a person opens an address (Chrome's Accept). */
+const BROWSER = { "Sec-Fetch-Dest": "document", Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" };
+
 const get = (handler: (r: Request) => Promise<Response>, path = "/sitemap.xml", browser = false) =>
-  handler(new Request(`https://www.example.com${path}`, { headers: browser ? { "Sec-Fetch-Dest": "document" } : {} }));
+  handler(new Request(`https://www.example.com${path}`, { headers: browser ? BROWSER : {} }));
+
+/** Twelve posts: with the home and pricing, fourteen pages, enough for the filter. */
+const posts = { "/[locale]/blog/[slug]": () => Array.from({ length: 12 }, (_, i) => ({ slug: `post-${i}` })) };
 
 const locs = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
 
@@ -55,12 +61,64 @@ describe("createSitemap", () => {
   });
 
   it("labels, counts and filters every language, not just the first few", async () => {
-    const html = await (await get(handler, "/sitemap.xml", true)).text();
+    const html = await (await get(createSitemap({ manifest, params: posts }), "/sitemap.xml", true)).text();
     for (const l of manifest.locales!.list) {
-      expect(html).toContain(`<span><b>3</b> ${l.toUpperCase()}</span>`);
+      expect(html).toContain(`<span><b>14</b> ${l.toUpperCase()}</span>`);
       expect(html).toContain(`data-f="${l}"`);
     }
-    expect(html).toMatch(/href="\/zh-CN\/pricing">[^<]*<\/a><span class="lang">ZH-CN</);
+    expect(html).toContain('<a class="lang" href="/zh-CN/pricing" hreflang="zh-CN">ZH-CN</a>');
+  });
+
+  it("shows a page's language versions as one row, each address still listed once", async () => {
+    const html = await (await get(handler, "/sitemap.xml", true)).text();
+    // Three pages in ten languages: three rows, thirty addresses.
+    expect(html.match(/<li class="row many"/g)).toHaveLength(3);
+    expect(html).toContain("<span><b>3</b> pages</span><span><b>30</b> addresses</span>");
+    // The row shows the version in the page's language and links the nine others.
+    const pricing = html.split("\n").find((line) => line.includes('href="/en/pricing"'))!;
+    expect(pricing).toContain('<a class="url" href="/en/pricing" hreflang="en">/en/pricing</a>');
+    expect(pricing).toContain('<span class="lang is-current">EN</span>');
+    expect(pricing.match(/<a class="lang"/g)).toHaveLength(9);
+  });
+
+  it("keeps a short list plain, and gives a long one its filter and its newest-first sort", async () => {
+    const short = await (await get(handler, "/sitemap.xml", true)).text();
+    expect(short).not.toContain('id="q"');
+    expect(short).not.toContain('id="recent"');
+    const long = await (await get(createSitemap({ manifest, params: posts }), "/sitemap.xml", true)).text();
+    expect(long).toContain('id="q"');
+    expect(long).toContain('<button type="button" class="chip sort" id="recent" aria-pressed="false">Recently updated</button>');
+    expect(long).toContain('<section class="group" id="recent-list"');
+  });
+
+  it("keeps the page out of shared caches, and lets them keep the XML", async () => {
+    expect((await get(handler, "/sitemap.xml", true)).headers.get("cache-control")).toBe("private, max-age=3600");
+    expect((await get(handler)).headers.get("cache-control")).toBe("public, max-age=3600");
+  });
+
+  it("gives the XML to a fetcher that sends Sec-Fetch-Dest without asking for HTML", async () => {
+    const headless = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { "Sec-Fetch-Dest": "document", Accept: "*/*" } }));
+    expect(headless.headers.get("content-type")).toBe("application/xml; charset=utf-8");
+    const bot = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { Accept: "text/html,application/xml" } }));
+    expect(bot.headers.get("content-type")).toBe("application/xml; charset=utf-8");
+  });
+
+  it("answers an unchanged sitemap with 304, and a changed one in full", async () => {
+    const first = await get(handler);
+    const tag = first.headers.get("etag")!;
+    expect(tag).toMatch(/^"[0-9a-f]{32}"$/);
+    expect(first.headers.get("last-modified")).toBe("Tue, 03 Nov 2026 00:00:00 GMT");
+    const again = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { "If-None-Match": `W/${tag}` } }));
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe("");
+    expect(again.headers.get("etag")).toBe(tag);
+    expect(again.headers.get("vary")).toBe("Sec-Fetch-Dest");
+    // The page and the XML are different files: one's tag never stands for the other.
+    const page = await handler(new Request("https://www.example.com/sitemap.xml", { headers: { ...BROWSER, "If-None-Match": tag } }));
+    expect(page.status).toBe(200);
+    // An address taken out changes the tag, though the newest date stays the same.
+    const fewer = createSitemap({ manifest, params: { "/[locale]/blog/[slug]": () => [] } });
+    expect((await fewer(new Request("https://www.example.com/sitemap.xml", { headers: { "If-None-Match": tag } }))).status).toBe(200);
   });
 
   it("carries no inline script or style, so default-src 'self' allows it", async () => {
@@ -247,7 +305,7 @@ describe("createSitemap", () => {
   it("works with no manifest at all, for a server that lists its own addresses", async () => {
     const bare = createSitemap({ site: "https://www.atelier.dev", entries: () => [{ loc: "/" }, { loc: "/work" }] });
     expect(locs(await (await bare(new Request("http://internal:8080/sitemap.xml"))).text())).toEqual(["https://www.atelier.dev/", "https://www.atelier.dev/work"]);
-    const html = await (await bare(new Request("http://internal:8080/sitemap.xml", { headers: { "Sec-Fetch-Dest": "document" } }))).text();
+    const html = await (await bare(new Request("http://internal:8080/sitemap.xml", { headers: BROWSER }))).text();
     expect(html).toContain("Every page on atelier.dev");
     const css = await (await bare(new Request("http://internal:8080/sitemap.xml?asset=page.css"))).text();
     expect(css).toContain("--bg:#fbfaf7");
@@ -354,7 +412,11 @@ describe("the page's language", () => {
   const french = { ...manifest, locales: { list: ["fr", "en"], default: "fr" } };
 
   it("speaks the site's own default language", async () => {
-    const html = await (await get(createSitemap({ manifest: french }), "/sitemap.xml", true)).text();
+    const html = await (await get(createSitemap({ manifest: french, params: posts }), "/sitemap.xml", true)).text();
+    expect(html).toContain("<span><b>14</b> pages</span><span><b>28</b> adresses</span>");
+    expect(html).toContain(">Mises à jour récentes</button>");
+    // Each row shows its French version first, in the site's default language.
+    expect(html).toContain('<a class="url" href="/fr/pricing" hreflang="fr">/fr/pricing</a>');
     expect(html).toContain('<html lang="fr">');
     expect(html).toContain("<title>Plan du site · Example &amp; Co</title>");
     expect(html).toContain("<h1>Toutes les pages d’Example &amp; Co");

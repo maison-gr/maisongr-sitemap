@@ -2,7 +2,7 @@
 
 > An open-source npm package (MIT, no runtime dependencies, Node 20.9+) that gives a website one sitemap with two readers. Search engines get standard XML at /sitemap.xml. A person opening the same address gets a page in the site's own colours, fonts and dark mode, without XSLT.
 
-It detects the framework, finds the pages, dates each one from Git, reads the theme and writes one route file. A browser opening a page sends `Sec-Fetch-Dest: document`, and crawlers never do: that header decides which answer is served. Both list the same addresses.
+It detects the framework, finds the pages, dates each one from Git, reads the theme and writes one route file. A browser opening a page sends `Sec-Fetch-Dest: document` and asks for HTML, and crawlers do neither: those two headers decide which answer is served. Both list the same addresses.
 
 ## Set it up
 
