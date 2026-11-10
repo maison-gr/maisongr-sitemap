@@ -6,12 +6,12 @@
     "url": "https://github.com/maison-gr/sitemap",
     "source": "github"
   },
-  "version": "1.6.0",
+  "version": "1.7.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "maisongr-sitemap",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }]

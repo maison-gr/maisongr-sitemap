@@ -4,6 +4,24 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-10
+
+The XML search engines read is byte for byte what 1.6.0 served; every change below is about the page people see, and about keeping the two answers apart.
+
+### Added
+
+- One row per page on the page people see: a page's language versions share a row, the version in the page's language shown and the others linked beside it, so a bilingual site lists half as many rows. Every address is still a link, exactly once. Picking a language in the filter shows each row's version in that language.
+- A "Recently updated" button lists the pages newest first, then puts them back in their sections.
+- An `ETag` on every answer, and `304 Not Modified` when a request's `If-None-Match` still matches, so a crawler skips an unchanged sitemap. Only the tag decides, never a date: a date would miss an address that was taken out. A `Last-Modified` header gives the newest page's date.
+
+### Changed
+
+- The filter, language buttons and sort appear above 10 rows; a shorter list reads faster on its own. The facts line counts pages and, when language versions share rows, addresses.
+- The page is `Cache-Control: private`, so a shared cache never stores it, even one that ignores `Vary` (some CDNs do) and could otherwise give it to a crawler as the sitemap. The XML stays `public`.
+- A browser gets the page only when it sends both `Sec-Fetch-Dest: document` and an `Accept` that asks for HTML, as every browser does when a person opens an address; a fetcher built on a browser engine that sends only the first gets the XML. The Vite plugin decides the same way. Check a server setup with `curl -H "Sec-Fetch-Dest: document" -H "Accept: text/html"`.
+- A sitemap splits into parts past 50 MB of XML as well as past 50,000 addresses, the protocol's two limits per file: a multilingual site with images can reach 50 MB first.
+- On a phone, a page in more than three languages puts its language links on their own line; two or three stay beside the address.
+
 ## [1.6.0] - 2026-11-05
 
 ### Added
