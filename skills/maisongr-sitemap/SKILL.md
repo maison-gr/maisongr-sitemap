@@ -34,6 +34,16 @@ Add `--json` to every command. It prints one report on stdout: `{ ok, sections: 
 
 5. Commit the route and its manifest. Shallow CI clones rely on the dates in the manifest.
 
+**Astro alternative.** If the user prefers configuration to a route file, add the integration instead of running `init`, and never both: it stops the build when `src/pages/sitemap.xml.ts` exists.
+
+```js
+// astro.config.mjs: `site` is required without an adapter
+import sitemap from "maisongr-sitemap/astro";
+export default defineConfig({ site: "https://the.site", integrations: [sitemap({ config: "./src/sitemap.config.ts" })] });
+```
+
+The `config` module's default export takes the route's options (`params`, `entries`, `exclude`…). Commit `src/sitemap.manifest.json` once `astro build` writes it.
+
 ## Replace another sitemap
 
 `init` stops without changing anything when another sitemap exists. Ask the user before taking over, then run:

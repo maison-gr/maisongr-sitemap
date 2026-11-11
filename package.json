@@ -28,6 +28,9 @@
       ],
       "vite": [
         "./dist/vite.d.ts"
+      ],
+      "astro": [
+        "./dist/astro.d.ts"
       ]
     }
   },
@@ -50,6 +53,10 @@
     "./vite": {
       "types": "./dist/vite.d.ts",
       "default": "./dist/vite.js"
+    },
+    "./astro": {
+      "types": "./dist/astro.d.ts",
+      "default": "./dist/astro.js"
     },
     "./package.json": "./package.json"
   },
@@ -88,6 +95,7 @@
     "xslt",
     "xml-sitemap",
     "sitemap-generator",
+    "astro-integration",
     "vite-plugin",
     "llms-txt",
     "mcp",
