@@ -105,5 +105,7 @@ describe("the route it writes", () => {
     expect(staticSite("https://a.dev/", "/docs/")).toBe("https://a.dev/docs");
     expect(staticSite("https://a.dev", "/")).toBe("https://a.dev");
     expect(staticSite("https://a.dev")).toBe("https://a.dev");
+    expect(staticSite("https://a.dev", "//docs//")).toBe("https://a.dev/docs");
+    expect(staticSite("https://a.dev", "/".repeat(100_000))).toBe("https://a.dev");
   });
 });
