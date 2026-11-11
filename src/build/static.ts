@@ -137,7 +137,8 @@ export function buildStatic(dir: string, site: string, options: StaticOptions = 
 
   for (const file of htmlFiles) {
     const path = pathOf(file, dir, keepHtml);
-    if (/^\/(404|500)(\.html?|\/)?$/.test(path) || path.startsWith("/sitemap/")) continue;
+    // Error pages, and 200.html: the empty app shell nuxt generate (and hosts such as Surge) serve for every route not prerendered.
+    if (/^\/(200|404|500)(\.html?|\/)?$/.test(path) || path.startsWith("/sitemap/")) continue;
     const privateSegment = privateOf(path.split("/").filter(Boolean));
     if (privateSegment) {
       skipped.push({ path, reason: `private page (${privateSegment})` });
