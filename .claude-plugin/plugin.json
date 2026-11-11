@@ -1,0 +1,20 @@
+{
+  "name": "maisongr-sitemap",
+  "displayName": "Maison GR Sitemap",
+  "version": "1.7.0",
+  "description": "Set up, replace or repair a website's sitemap: the XML search engines need, and a page in the site's own design for people, with no XSLT. The Agent Skill teaches the steps; the MCP server runs them.",
+  "author": {
+    "name": "Maison GR",
+    "url": "https://www.maisongr.com"
+  },
+  "homepage": "https://github.com/maison-gr/maisongr-sitemap#readme",
+  "repository": "https://github.com/maison-gr/maisongr-sitemap",
+  "license": "MIT",
+  "keywords": ["sitemap", "seo", "hreflang", "lastmod", "llms-txt", "nextjs", "astro", "sveltekit", "nuxt", "express", "vite"],
+  "mcpServers": {
+    "sitemap": {
+      "command": "npx",
+      "args": ["-y", "maisongr-sitemap@1.7.0", "mcp"]
+    }
+  }
+}

@@ -7,6 +7,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 ### Added
 
 - An Astro integration, `maisongr-sitemap/astro`: one line in `astro.config` instead of a route file and a build step. With an adapter it renders `/sitemap.xml` on demand and refreshes the manifest before each build; without one it writes the sitemap into the build output, under the site's `base` path. `astro dev` serves it either way, and never rewrites a manifest that exists. Route options go in a module named by `config`.
+- A Claude Code plugin: the Agent Skill and the MCP server in one install, `/plugin install maisongr-sitemap --marketplace maison-gr/maisongr-skills`. The server it starts is pinned to the plugin's own version, and a test keeps the two in step with the package.
 - `llms` warns about meta descriptions over 160 characters, which search results cut, and under 50, naming up to three pages for each.
 
 ### Changed
@@ -15,7 +16,9 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ### Fixed
 
+- `static` leaves out `200.html`, the empty app shell `nuxt generate` writes for every route it didn't prerender, which it listed as a page called `/200` ([#4](https://github.com/maison-gr/maisongr-sitemap/issues/4)).
 - `indexnow` follows only the parts of a sitemap index on the site's own host, as search engines do, so a sitemap can no longer make it fetch another address. Reading the sitemap and checking the key file now give up after 20 seconds instead of waiting forever.
+- A Next.js icon kept in a route group (`app/(site)/icon.svg`) now shows on the sitemap page. Next serves such an icon at a hashed address, so `build` copies it to `public/_sitemap/` beside the fonts and links it from there; before, the page had no icon and browsers asked for a missing `/favicon.ico`.
 
 ## [1.7.0] - 2026-11-10
 

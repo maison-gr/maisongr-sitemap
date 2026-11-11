@@ -1,7 +1,8 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { trimSlashes } from "../entries.js";
 import { readPackage } from "./detect.js";
+import { FONT_DIR } from "./fonts.js";
 
 const IGNORE = new Set(["node_modules", ".next", ".git", "dist", "out", "build", ".turbo", ".vercel", "coverage", "public"]);
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -101,11 +102,24 @@ export function findName(root: string, layoutSource: string): string {
   return name.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** The icon path the site serves, if it has one: Next.js app/icon.*, or a favicon in the public directory. */
+/**
+ * The icon path the site serves, if it has one: Next.js app/icon.*, or a favicon in the public directory.
+ * An icon inside a Next.js route group, app/(site)/icon.svg, is served at a hashed address the page cannot
+ * know, so it is copied beside the fonts in public/_sitemap/ and linked from there.
+ */
 export function findIcon(root: string, appDir?: string, publicDir = join(root, "public")): string | undefined {
   const app = appDir ? join(root, appDir) : null;
   for (const n of ["icon.svg", "icon.png", "favicon.ico"]) if (app && existsSync(join(app, n))) return `/${n}`;
   for (const n of ["favicon.svg", "icon.svg", "favicon.ico", "favicon.png"]) if (existsSync(join(publicDir, n))) return `/${n}`;
+  if (!app || !existsSync(app)) return undefined;
+  for (const group of readdirSync(app).filter((n) => /^\(.+\)$/.test(n)).sort()) {
+    for (const n of ["icon.svg", "icon.png"]) {
+      if (!existsSync(join(app, group, n))) continue;
+      mkdirSync(join(publicDir, FONT_DIR), { recursive: true });
+      copyFileSync(join(app, group, n), join(publicDir, FONT_DIR, n));
+      return `/${FONT_DIR}/${n}`;
+    }
+  }
   return undefined;
 }
 
