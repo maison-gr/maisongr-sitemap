@@ -38,6 +38,9 @@ ${config ? `import options from ${JSON.stringify(config)};` : "const options = {
 
 /** The site's public address with its base path: what each address in a static build starts with. */
 export function staticSite(site: string, base?: string): string {
-  const path = base && base !== "/" ? `/${base.replace(/^\/+|\/+$/g, "")}` : "";
-  return `${trimSlashes(site)}${path}`;
+  // Slashes trimmed by counting, not by a regex, which a long run of "/" in a config could make slow.
+  let start = 0;
+  while (base && base.charCodeAt(start) === 47) start++;
+  const path = base ? trimSlashes(base.slice(start)) : "";
+  return `${trimSlashes(site)}${path ? `/${path}` : ""}`;
 }
