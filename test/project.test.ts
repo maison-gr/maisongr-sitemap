@@ -217,6 +217,19 @@ describe("a full Next.js project", () => {
     expect(report.locales).toEqual({ list: ["en", "fr", "ar"], default: "fr" });
     expect(report.theme).toMatchObject({ name: "Demo", icon: "/icon.svg", light: { accent: "#2f3bff" }, dark: { background: "#0b0b0b" } });
   });
+
+  it("links an icon kept in a route group from the sitemap's own folder, since Next serves it at a hashed address", async () => {
+    const root = project({
+      "package.json": '{"name":"demo","dependencies":{"next":"15"}}',
+      "app/(site)/layout.tsx": "",
+      "app/(site)/page.tsx": "",
+      "app/(site)/icon.svg": "<svg id='site'/>",
+      "app/(workspace)/icon.svg": "<svg id='app'/>",
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.theme).toMatchObject({ icon: "/_sitemap/icon.svg" });
+    expect(readFileSync(join(root, "public/_sitemap/icon.svg"), "utf8")).toBe("<svg id='site'/>");
+  });
 });
 
 describe("next.config", () => {

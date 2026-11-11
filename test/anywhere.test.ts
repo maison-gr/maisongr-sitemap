@@ -170,6 +170,19 @@ describe("a hand-written HTML site", () => {
     expect(siteNameOf([], "<title>Orbit — Plan your launch</title>")).toBe("Orbit");
   });
 
+  it("leaves out the error pages and the 200.html fallback that nuxt generate writes for every other route", () => {
+    const root = project({
+      "index.html": page("Copper"),
+      "about/index.html": page("About"),
+      "200.html": page("Copper"),
+      "404.html": page("Not found"),
+      "500.html": page("Error"),
+    });
+    expect(buildStatic(root, "https://copper.example").pages).toBe(2);
+    const xml = readFileSync(join(root, "sitemap.xml"), "utf8");
+    expect(xml).not.toMatch(/\/(200|404|500)</);
+  });
+
   it("loads each font once, though a build holds its @font-face in a stylesheet and inlined in the home page", () => {
     const face = '@font-face{font-family:Inter;src:url("/fonts/inter.woff2") format("woff2");font-weight:400 700}';
     const root = project({ "index.html": page("Orbit", `<style>${face}</style>`), "assets/index.css": face });
