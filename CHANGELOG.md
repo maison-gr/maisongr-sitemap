@@ -15,6 +15,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 ### Fixed
 
 - `indexnow` follows only the parts of a sitemap index on the site's own host, as search engines do, so a sitemap can no longer make it fetch another address. Reading the sitemap and checking the key file now give up after 20 seconds instead of waiting forever.
+- A Next.js icon kept in a route group (`app/(site)/icon.svg`) now shows on the sitemap page. Next serves such an icon at a hashed address, so `build` copies it to `public/_sitemap/` beside the fonts and links it from there; before, the page had no icon and browsers asked for a missing `/favicon.ico`.
 
 ## [1.7.0] - 2026-11-10
 
