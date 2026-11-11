@@ -6,6 +6,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ### Added
 
+- A Claude Code plugin: the Agent Skill and the MCP server in one install, `/plugin install maisongr-sitemap --marketplace maison-gr/maisongr-skills`. The server it starts is pinned to the plugin's own version, and a test keeps the two in step with the package.
 - `llms` warns about meta descriptions over 160 characters, which search results cut, and under 50, naming up to three pages for each.
 
 ### Changed

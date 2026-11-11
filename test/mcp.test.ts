@@ -40,6 +40,15 @@ describe("the MCP server", () => {
     expect([server.version, server.packages[0].version]).toEqual([pkg.version, pkg.version]);
   });
 
+  it("keeps the Claude Code plugin in step with the package, and starts the server of that same version", () => {
+    const read = (f: string) => JSON.parse(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
+    const [pkg, plugin] = [read("package.json"), read(".claude-plugin/plugin.json")];
+    expect(plugin.name).toBe(pkg.name);
+    expect(plugin.version).toBe(pkg.version);
+    expect(plugin.mcpServers.sitemap).toEqual({ command: "npx", args: ["-y", `maisongr-sitemap@${pkg.version}`, "mcp"] });
+    expect(readFileSync(new URL("../skills/maisongr-sitemap/SKILL.md", import.meta.url), "utf8")).toMatch(/^---\nname: maisongr-sitemap\n/);
+  });
+
   it("does not offer indexnow, which sends to outside services", () => {
     expect(Object.keys(TOOLS).join()).not.toContain("indexnow");
   });
