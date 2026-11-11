@@ -15,6 +15,7 @@ Run from the project's root, then do what the report's Next section says.
 - Express, Connect, Polka, node:http: `npx maisongr-sitemap init` in the server's folder, then list the addresses in `sitemap.js` and mount it
 - Hono, Cloudflare Workers, Bun, Deno, React Router: call `createSitemap` from `maisongr-sitemap` with a Request
 - A built static site: `npx maisongr-sitemap static dist --site https://your.site`
+- WordPress: the Maison GR Sitemap plugin, https://github.com/maison-gr/maisongr-sitemap-wordpress (the same page and XML, from posts, pages and terms)
 - PHP, Python, Ruby, Go, Java, .NET, a CMS: `npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://your.site`
 
 ## Replace another sitemap

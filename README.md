@@ -55,7 +55,8 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
 | **Single-page apps**: Vite (React, Vue, Solid, Svelte, Preact) and Create React App | Static mode after your build, with the pages read from your router (see [Single-page apps](#single-page-apps)) |
 | **Any static site**: hand-written HTML, Eleventy, Hugo, Jekyll, any generator | [`static`](#static-sites) on the build output |
-| **Any other language**: PHP (Laravel, WordPress, Symfony), Python, Ruby, Go, Java, .NET, a CMS | [`crawl`](#any-site-in-any-language) reads the running site |
+| **WordPress** | The [WordPress plugin](https://github.com/maison-gr/maisongr-sitemap-wordpress): the same page, in your theme's colours and fonts, from your posts, pages and terms |
+| **Any other language**: PHP (Laravel, Symfony), Python, Ruby, Go, Java, .NET, a CMS | [`crawl`](#any-site-in-any-language) reads the running site |
 
 Each one has been checked on a real production build: Next.js 15 and 16 (App Router, Pages Router and `cacheComponents`), Astro 7, SvelteKit 3, Nuxt 4 (with `@nuxtjs/i18n`), Express 5, Hono 4, React Router 8, a Vite React app, Eleventy 3, a hand-written HTML site and a server that renders each page on request. The handler also runs on Bun 1.4 and Deno 2.9.
 
@@ -424,7 +425,7 @@ For a site no file describes, PHP, Python, Ruby, Go, a CMS, `crawl` reads it the
 npx maisongr-sitemap crawl http://localhost:8000 --out public --site https://www.example.com
 ```
 
-- `--out` is the folder your server serves files from (`public/` in Laravel and Symfony, the web root in WordPress). The files are the same as static mode's: `sitemap.xml` and the page at `/sitemap/`.
+- `--out` is the folder your server serves files from (`public/` in Laravel and Symfony; for WordPress, use the [plugin](https://github.com/maison-gr/maisongr-sitemap-wordpress) instead). The files are the same as static mode's: `sitemap.xml` and the page at `/sitemap/`.
 - `--site` is the public address, when you crawl a local or staging copy. Without it, the address crawled is the one listed.
 - It follows `robots.txt`, `noindex` (in the page or its `X-Robots-Tag` header), `nofollow`, canonicals, redirects and `hreflang` alternates. It leaves out sign-in and account pages, and addresses with a query string, which search engines treat as copies.
 - **Dates** come only from what each page states: `article:modified_time`, `dateModified` in its JSON-LD, or a `Last-Modified` header. A header that says "now" on every response is ignored.
