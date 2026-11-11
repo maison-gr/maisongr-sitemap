@@ -1,13 +1,13 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { detect } from "./build/detect.js";
 import { buildFramework, manifestPathFor } from "./build/framework-build.js";
 import { buildStatic } from "./build/static.js";
-import { trimSlashes } from "./entries.js";
 import { existingRoutes } from "./cli/routes.js";
+import { pageOptionLines, routeImports, specifier, staticSite, type PageOptions } from "./integration.js";
 
-export type AstroSitemapOptions = {
+export type AstroSitemapOptions = PageOptions & {
   /**
    * A module, relative to the project, whose default export holds the route's
    * options: values for dynamic routes, more addresses, more sitemaps, rules.
@@ -15,12 +15,6 @@ export type AstroSitemapOptions = {
    *   export default { params: { "/blog/[slug]": async () => (await getCollection("blog")).map((p) => ({ slug: p.id })) } };
    */
   config?: string;
-  /** The site's name on the page. Default what the site's pages say. */
-  name?: string;
-  /** The "Sitemap by Maison GR" footer line. Default true. */
-  credit?: boolean;
-  /** The language of the page people see: "en" or "fr". Default the site's own. */
-  lang?: string;
   /** Static builds: list each page's images too. */
   images?: boolean;
 };
@@ -38,41 +32,21 @@ type SetupOptions = {
 
 const NAME = "maisongr-sitemap";
 
-/** An import specifier from one file to another, relative and with forward slashes, as Vite resolves it on every system. */
-function specifier(from: string, to: string): string {
-  const path = relative(from, to).split("\\").join("/");
-  return path.startsWith(".") ? path : `./${path}`;
-}
-
 /** The route Astro renders on demand at /sitemap.xml: the same as the file `init` writes in src/pages, kept out of the project. */
-export function astroRouteSource(dir: string, manifest: string, config?: string, page: Pick<AstroSitemapOptions, "name" | "credit" | "lang"> = {}): string {
-  // The integration's own options, as the route's. The name goes in the theme, where the handler reads it, beside the config module's theme.
-  const own = [
-    page.name ? `theme: { ...options.theme, name: ${JSON.stringify(page.name)} }` : "",
-    page.credit === false ? "credit: false" : "",
-    page.lang ? `lang: ${JSON.stringify(page.lang)}` : "",
-  ].filter(Boolean);
+export function astroRouteSource(dir: string, manifest: string, config?: string, page: PageOptions = {}): string {
   return `// Written by maisongr-sitemap's Astro integration before each build. Edit astro.config, not this file.
-import { createSitemap } from "maisongr-sitemap";
-import manifest from ${JSON.stringify(specifier(dir, manifest))};
-${config ? `import options from ${JSON.stringify(specifier(dir, config))};\n` : "const options = {};\n"}
+${routeImports(specifier(dir, manifest), config && specifier(dir, config))}
+
 // The answer depends on the request's Sec-Fetch-Dest header, so it is rendered on demand.
 export const prerender = false;
 
-const sitemap = createSitemap({ ...options, manifest${own.map((o) => `, ${o}`).join("")} });
+const sitemap = createSitemap({ ...options, manifest${pageOptionLines(page).map((o) => `, ${o}`).join("")} });
 
 export const GET = ({ request }) => sitemap(request);
 `;
 }
 
-/** The site's public address with its base path: what each address in a static build starts with. */
-export function staticSite(site: string, base?: string): string {
-  // Slashes trimmed by counting, not by a regex, which a long run of "/" in a config could make slow.
-  let start = 0;
-  while (base && base.charCodeAt(start) === 47) start++;
-  const path = base ? trimSlashes(base.slice(start)) : "";
-  return `${trimSlashes(site)}${path ? `/${path}` : ""}`;
-}
+export { staticSite };
 
 /**
  * The sitemap as an Astro integration:
@@ -115,7 +89,10 @@ export default function sitemap(options: AstroSitemapOptions = {}) {
         if (command === "build" || !existsSync(manifest)) {
           const report = await buildFramework(root, { ...astro, server: true });
           logger.info(`${report.routes} routes, ${report.dated} dated from Git`);
-          if (report.needParams.length) logger.warn(`Dynamic routes not listed until the config module gives their values: ${report.needParams.join(", ")}`);
+          if (report.needParams.length) {
+            if (options.config) logger.info(`Dynamic routes, listed with the values ${options.config} gives: ${report.needParams.join(", ")}`);
+            else logger.warn(`Dynamic routes not listed until a config module gives their values (sitemap({ config })): ${report.needParams.join(", ")}`);
+          }
         }
         const config_ = options.config ? (isAbsolute(options.config) ? options.config : resolve(root, options.config)) : undefined;
         if (config_ && !existsSync(config_)) throw new Error(`${NAME}: the config module ${options.config} was not found.`);

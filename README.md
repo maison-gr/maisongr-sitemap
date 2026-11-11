@@ -49,7 +49,7 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 | **Next.js** (App and Pages Router) | `app/sitemap.xml/route.ts` |
 | **Astro** with an adapter | `src/pages/sitemap.xml.ts`, rendered on demand, or one line in `astro.config` (see [Astro integration](#astro-integration)) |
 | **SvelteKit** | `src/routes/sitemap.xml/+server.ts` |
-| **Nuxt** 3 and 4 | `server/routes/sitemap.xml.ts` |
+| **Nuxt** 3 and 4 | `server/routes/sitemap.xml.ts`, or one line in `nuxt.config` (see [Nuxt module](#nuxt-module)) |
 | **Static builds**: Astro without an adapter, SvelteKit with `adapter-static`, `nuxt generate` | Static mode, run after your build |
 | **Express**, Connect, Polka, `node:http` | `sitemap.js` beside the server's entry, themed from the frontend it serves (see [Express](#express-and-nodehttp)) |
 | **Anything that speaks `Request` and `Response`**: Hono, Cloudflare Workers, Bun, Deno, React Router | The [handler](#any-other-server) itself |
@@ -125,6 +125,26 @@ export default {
 It takes the options of [the route](#the-route): `params`, `entries`, `sitemaps`, `exclude`, `transform` and the rest. `sitemap()` itself takes `name`, `credit` and `lang` for the page people see, and `images` for a static build.
 
 Use the integration or a route in `src/pages`, not both: the integration stops the build when `src/pages/sitemap.xml.ts` exists.
+
+## Nuxt module
+
+Nuxt projects can skip the route file and the build step too:
+
+```ts
+export default defineNuxtConfig({
+  modules: ["maisongr-sitemap/nuxt"],
+  maisongrSitemap: {
+    site: "https://www.example.com",
+    config: "./server/sitemap.config.ts",
+  },
+});
+```
+
+- **`nuxt build`** serves `/sitemap.xml` from the server: the XML for search engines, the designed page for a browser. Each build refreshes `server/sitemap.manifest.json` first. Commit it: shallow CI clones keep its dates. Nothing else is written into your project.
+- **`nuxt generate`**, or a static preset, writes the sitemap into `.output/public` once the pages are prerendered, under your `app.baseURL`. `site` is required.
+- **`nuxt dev`** serves `/sitemap.xml` either way. It writes the manifest only when the file is missing, and never changes one that exists.
+
+The `config` module works as for [Astro](#astro-integration): its default export takes the route's options. `maisongrSitemap` also takes `name`, `credit` and `lang` for the page people see, and `images` for `nuxt generate`. Its own key keeps it apart from `@nuxtjs/sitemap`'s `sitemap`. Use the module or `server/routes/sitemap.xml.ts`, not both.
 
 ## Moving from another sitemap
 

@@ -28,6 +28,10 @@ const integration = astroSitemap();
 assert.equal(integration.name, "maisongr-sitemap");
 assert.equal(typeof integration.hooks["astro:config:setup"], "function");
 
+// The Nuxt module loads without Nuxt, and names its nuxt.config key.
+const { default: nuxtModule } = await import("../dist/nuxt.js");
+assert.equal((await nuxtModule.getMeta()).configKey, "maisongrSitemap");
+
 const version = execFileSync(process.execPath, [fileURLToPath(new URL("../dist/cli/index.js", import.meta.url)), "--version"], { encoding: "utf8" });
 assert.match(version, /^\d+\.\d+\.\d+/);
 

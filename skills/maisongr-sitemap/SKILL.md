@@ -44,6 +44,16 @@ export default defineConfig({ site: "https://the.site", integrations: [sitemap({
 
 The `config` module's default export takes the route's options (`params`, `entries`, `exclude`…). Commit `src/sitemap.manifest.json` once `astro build` writes it.
 
+**Nuxt alternative.** The same, as a module, never beside `server/routes/sitemap.xml.ts`:
+
+```ts
+// nuxt.config.ts: `site` is required for nuxt generate
+modules: ["maisongr-sitemap/nuxt"],
+maisongrSitemap: { site: "https://the.site", config: "./server/sitemap.config.ts" },
+```
+
+Commit `server/sitemap.manifest.json` once `nuxt build` writes it.
+
 ## Replace another sitemap
 
 `init` stops without changing anything when another sitemap exists. Ask the user before taking over, then run:
