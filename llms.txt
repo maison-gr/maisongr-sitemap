@@ -11,6 +11,7 @@ Run from the project's root, then do what the report's Next section says.
 - Next.js, Astro with an adapter, SvelteKit, Nuxt: `npx maisongr-sitemap init`, then `npm install maisongr-sitemap`
 - Astro without an adapter, adapter-static, nuxt generate, Vite and Create React App: `npx maisongr-sitemap init --site https://your.site`, then `npm install --save-dev maisongr-sitemap`
 - Astro, either way, as an integration: `integrations: [sitemap()]` with `import sitemap from "maisongr-sitemap/astro"` and `site` set in `astro.config`; no route file or build step
+- Nuxt, either way, as a module: `modules: ["maisongr-sitemap/nuxt"]` and `maisongrSitemap: { site: "https://your.site" }` in `nuxt.config`; no route file or build step
 - Express, Connect, Polka, node:http: `npx maisongr-sitemap init` in the server's folder, then list the addresses in `sitemap.js` and mount it
 - Hono, Cloudflare Workers, Bun, Deno, React Router: call `createSitemap` from `maisongr-sitemap` with a Request
 - A built static site: `npx maisongr-sitemap static dist --site https://your.site`

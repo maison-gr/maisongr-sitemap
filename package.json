@@ -31,6 +31,9 @@
       ],
       "astro": [
         "./dist/astro.d.ts"
+      ],
+      "nuxt": [
+        "./dist/nuxt.d.ts"
       ]
     }
   },
@@ -57,6 +60,10 @@
     "./astro": {
       "types": "./dist/astro.d.ts",
       "default": "./dist/astro.js"
+    },
+    "./nuxt": {
+      "types": "./dist/nuxt.d.ts",
+      "default": "./dist/nuxt.js"
     },
     "./package.json": "./package.json"
   },
@@ -96,6 +103,7 @@
     "xml-sitemap",
     "sitemap-generator",
     "astro-integration",
+    "nuxt-module",
     "vite-plugin",
     "llms-txt",
     "mcp",
