@@ -406,6 +406,14 @@ Run it again whenever content changes, after a deploy or from a daily cron, so t
 
 ## For AI agents
 
+**Claude Code plugin.** The Agent Skill and the MCP server below in one install, from the Maison GR marketplace:
+
+```text
+/plugin install maisongr-sitemap --marketplace maison-gr/maisongr-skills
+```
+
+On Claude Code before 2.1.275, add the marketplace first: `/plugin marketplace add maison-gr/maisongr-skills`, then `/plugin install maisongr-sitemap@maison-gr`. The server it starts is the same version as the plugin.
+
 **Agent Skill.** Teaches Claude Code, Codex, Cursor and other coding agents the steps above:
 
 ```sh
