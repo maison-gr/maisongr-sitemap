@@ -47,7 +47,7 @@ The page reads your colours, fonts and dark mode from your own stylesheets. The 
 | | What `init` sets up |
 |---|---|
 | **Next.js** (App and Pages Router) | `app/sitemap.xml/route.ts` |
-| **Astro** with an adapter | `src/pages/sitemap.xml.ts`, rendered on demand |
+| **Astro** with an adapter | `src/pages/sitemap.xml.ts`, rendered on demand, or one line in `astro.config` (see [Astro integration](#astro-integration)) |
 | **SvelteKit** | `src/routes/sitemap.xml/+server.ts` |
 | **Nuxt** 3 and 4 | `server/routes/sitemap.xml.ts` |
 | **Static builds**: Astro without an adapter, SvelteKit with `adapter-static`, `nuxt generate` | Static mode, run after your build |
@@ -85,6 +85,46 @@ Each one has been checked on a real production build: Next.js 15 and 16 (App Rou
 If another file or package already serves `/sitemap.xml` (`next-sitemap`, `@astrojs/sitemap`, `@nuxtjs/sitemap`, a `public/sitemap.xml`), `init` stops and says so, before writing anything. `init --replace` takes over instead (see [Moving from another sitemap](#moving-from-another-sitemap)).
 
 Then install it: `npm install maisongr-sitemap`.
+
+## Astro integration
+
+Astro projects can skip the route file and the build step, with one line in `astro.config`:
+
+```js
+import { defineConfig } from "astro/config";
+import sitemap from "maisongr-sitemap/astro";
+
+export default defineConfig({
+  site: "https://www.example.com",
+  integrations: [sitemap()],
+});
+```
+
+- **With an adapter**, `/sitemap.xml` is rendered on demand: the XML for search engines, the designed page for a browser. Each `astro build` refreshes `src/sitemap.manifest.json` first. Commit it: shallow CI clones keep its dates.
+- **Without one**, the sitemap is written into `dist` after each `astro build`, from the pages the build wrote, under your `base` path. `site` is required.
+- **`astro dev`** serves `/sitemap.xml` either way. It writes `src/sitemap.manifest.json` only when the file is missing, and never changes one that exists.
+
+On demand, dynamic routes and every other route option go in a module of your own:
+
+```js
+// astro.config
+integrations: [sitemap({ config: "./src/sitemap.config.ts" })],
+```
+
+```ts
+// src/sitemap.config.ts
+import { getCollection } from "astro:content";
+
+export default {
+  params: {
+    "/blog/[slug]": async () => (await getCollection("blog")).map((p) => ({ slug: p.id, lastmod: p.data.updated })),
+  },
+};
+```
+
+It takes the options of [the route](#the-route): `params`, `entries`, `sitemaps`, `exclude`, `transform` and the rest. `sitemap()` itself takes `name`, `credit` and `lang` for the page people see, and `images` for a static build.
+
+Use the integration or a route in `src/pages`, not both: the integration stops the build when `src/pages/sitemap.xml.ts` exists.
 
 ## Moving from another sitemap
 

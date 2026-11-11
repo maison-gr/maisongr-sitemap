@@ -22,6 +22,12 @@ const res = await fetch(`http://127.0.0.1:${server.address().port}/sitemap.xml`)
 assert.equal(res.headers.get("content-type"), "application/xml; charset=utf-8");
 server.close();
 
+// The Astro integration loads without Astro, as an integration Astro can call.
+const { default: astroSitemap } = await import("../dist/astro.js");
+const integration = astroSitemap();
+assert.equal(integration.name, "maisongr-sitemap");
+assert.equal(typeof integration.hooks["astro:config:setup"], "function");
+
 const version = execFileSync(process.execPath, [fileURLToPath(new URL("../dist/cli/index.js", import.meta.url)), "--version"], { encoding: "utf8" });
 assert.match(version, /^\d+\.\d+\.\d+/);
 
