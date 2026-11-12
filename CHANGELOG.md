@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Fixed
+
+- In a Next.js project with no dynamic pages, the generated `app/sitemap.xml/params.ts` no longer imports `staticParams` it never uses, so the project's lint stays clean ([#11](https://github.com/maison-gr/maisongr-sitemap/issues/11)).
+
 ## [1.8.0] - 2026-11-11
 
 ### Added

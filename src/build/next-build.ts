@@ -166,14 +166,14 @@ function writeParamsFile(root: string, appDir: string, routes: FoundRoute[]) {
     const spec = toPosix(relative(dirname(file), join(root, r.page!))).replace(/\.(tsx|ts|jsx|js)$/, "");
     return `  ${literal(r.pattern)}: staticParams(() => import(${literal(spec.startsWith(".") ? spec : `./${spec}`)}), ${literal(r.pattern)}),`;
   });
+  // With no page to hand over, an import of staticParams would be unused and fail the project's lint (#11).
+  const imports = lines.length ? `import { staticParams } from "maisongr-sitemap/next";\n\n` : "";
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(
     file,
     `// Written by \`maisongr-sitemap build\` before each build: each dynamic page's own generateStaticParams,
 // so its addresses are listed with nothing to keep in sync. Don't edit it; give other values in route${ts ? ".ts" : ".js"} with \`params\`.
-import { staticParams } from "maisongr-sitemap/next";
-
-export const pageParams = {
+${imports}export const pageParams = {
 ${lines.join("\n")}
 };
 `,
