@@ -56,7 +56,13 @@ export function staticParams(
 /** "/blog/hello" against "/blog/[slug]" → { slug: "hello" }; catch-alls take the rest, as an array. */
 function paramsFromPath(pattern: string, path: string): ParamRow | null {
   const want = pattern.split("/").filter(Boolean);
-  const got = path.split("?")[0]!.split("/").filter(Boolean).map(decodeURIComponent);
+  let got: string[];
+  try {
+    got = path.split("?")[0]!.split("/").filter(Boolean).map(decodeURIComponent);
+  } catch {
+    // A % that isn't an escape ("50%off"): this path is left out, not the page's others.
+    return null;
+  }
   const row: ParamRow = {};
   for (let i = 0; i < want.length; i++) {
     const seg = want[i]!;

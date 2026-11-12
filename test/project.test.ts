@@ -322,6 +322,12 @@ describe("dynamic pages that list their own values", () => {
     expect(docs).toEqual([{ path: ["a", "b"] }]);
   });
 
+  it("leaves out only a getStaticPaths path it can't read, not the page's others (#16)", async () => {
+    const { staticParams } = await import("../src/next.js");
+    const rows = await staticParams(async () => ({ getStaticPaths: () => ({ paths: ["/blog/a", "/blog/50%off", "/blog/caf%C3%A9"] }) }), "/blog/[slug]")();
+    expect(rows).toEqual([{ slug: "a" }, { slug: "café" }]);
+  });
+
   it("takes rows from generateStaticParams, and leaves out a page whose generateStaticParams fails", async () => {
     const { staticParams } = await import("../src/next.js");
     expect(await staticParams(async () => ({ generateStaticParams: () => [{ locale: "en", slug: "a" }] }))()).toEqual([{ locale: "en", slug: "a" }]);
