@@ -1,7 +1,7 @@
 {
   "name": "maisongr-sitemap",
   "displayName": "Maison GR Sitemap",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Set up, replace or repair a website's sitemap: the XML search engines need, and a page in the site's own design for people, with no XSLT. The Agent Skill teaches the steps; the MCP server runs them.",
   "author": {
     "name": "Maison GR",
@@ -14,7 +14,7 @@
   "mcpServers": {
     "sitemap": {
       "command": "npx",
-      "args": ["-y", "maisongr-sitemap@1.8.1", "mcp"]
+      "args": ["-y", "maisongr-sitemap@1.8.2", "mcp"]
     }
   }
 }
