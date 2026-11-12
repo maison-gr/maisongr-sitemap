@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-11
+
 ### Added
 
 - An Astro integration, `maisongr-sitemap/astro`: one line in `astro.config` instead of a route file and a build step. With an adapter it renders `/sitemap.xml` on demand and refreshes the manifest before each build; without one it writes the sitemap into the build output, under the site's `base` path. `astro dev` serves it either way, and never rewrites a manifest that exists. Route options go in a module named by `config`.
@@ -188,6 +190,8 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.8.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.0
+[1.7.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.7.0
 [1.6.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.6.0
 [1.5.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.5.1
 [1.5.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.5.0
