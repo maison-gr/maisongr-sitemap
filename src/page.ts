@@ -1,3 +1,4 @@
+import { readable } from "./entries.js";
 import { stringsFor, type Strings } from "./strings.js";
 import type { Entry, Font, Palette, Theme } from "./types.js";
 
@@ -57,7 +58,7 @@ function sectionsOf(entries: Entry[]): Map<string, Entry[]> {
   return sections;
 }
 
-const titleOf = (section: string, t: Strings) => (section ? `/${decodeURIComponent(section)}/` : t.pagesSection);
+const titleOf = (section: string, t: Strings) => (section ? `/${readable(section)}/` : t.pagesSection);
 
 /** Above this many rows the page gets its filter and sort; below, the list reads faster on its own. */
 const TOOLS_FROM = 10;
