@@ -322,6 +322,17 @@ describe("createSitemap", () => {
     expect((await get(big, "/sitemap.xml?part=3")).status).toBe(404);
   });
 
+  it("answers 404 to a part that isn't a part number, so no file has a second address (#14)", async () => {
+    const one = createSitemap({ manifest: { ...manifest, routes: [{ pattern: "/" }], locales: undefined } });
+    const named = createSitemap({ manifest: { ...manifest, routes: [{ pattern: "/" }], locales: undefined }, sitemaps: { jobs: () => [{ loc: "/jobs/1" }] } });
+    for (const part of ["abc", "0", "1.0", "-1", "", "01"]) {
+      expect((await get(one, `/sitemap.xml?part=${part}`)).status, part).toBe(404);
+      expect((await get(named, `/sitemap.xml?sitemap=jobs&part=${part}`)).status, part).toBe(404);
+    }
+    expect((await get(one, "/sitemap.xml?part=1")).status).toBe(200);
+    expect((await get(named, "/sitemap.xml?sitemap=jobs&part=1")).status).toBe(200);
+  });
+
   it("works with no manifest at all, for a server that lists its own addresses", async () => {
     const bare = createSitemap({ site: "https://www.atelier.dev", entries: () => [{ loc: "/" }, { loc: "/work" }] });
     expect(locs(await (await bare(new Request("http://internal:8080/sitemap.xml"))).text())).toEqual(["https://www.atelier.dev/", "https://www.atelier.dev/work"]);

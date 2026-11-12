@@ -248,7 +248,10 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
     };
 
     const name = url.searchParams.get("sitemap");
-    const part = Number(url.searchParams.get("part") ?? 0);
+    // Only the part numbers the index lists (1, 2, …): any other value would give a file a second address.
+    const given = url.searchParams.get("part");
+    if (given !== null && !/^[1-9]\d*$/.test(given)) return notFound();
+    const part = Number(given ?? 0);
     const at = (query: string) => `${site}${url.pathname}?${query}`;
 
     // One sitemap: past the protocol's limit it becomes an index of ?part=N files.
