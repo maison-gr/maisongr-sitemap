@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Fixed
+
+- `?part=` answers 404 unless it is a part number the index lists (`1`, `2`, …): `?part=abc` or `?part=0` no longer serve a sitemap under a second address ([#14](https://github.com/maison-gr/maisongr-sitemap/issues/14)).
+
 ## [1.8.1] - 2026-11-12
 
 ### Fixed
