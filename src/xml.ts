@@ -1,3 +1,4 @@
+import { w3cDate } from "./entries.js";
 import type { Entry, News, Video } from "./types.js";
 
 /** The protocol's limit per file; above it the sitemap becomes an index of parts. */
@@ -16,10 +17,6 @@ const NS = {
   news: `xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"`,
 };
 
-/** A W3C date or datetime as given, or undefined: one invalid date makes Search Console reject the file. */
-const w3c = (value: string | undefined) =>
-  value && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/.test(value.trim()) && !Number.isNaN(Date.parse(value)) ? value.trim() : undefined;
-
 const tag = (name: string, value: string | number | undefined) => (value === undefined || value === "" ? [] : [`<${name}>${escapeXml(String(value))}</${name}>`]);
 
 function videoXml(v: Video, page: string): string | null {
@@ -32,7 +29,7 @@ function videoXml(v: Video, page: string): string | null {
     ...tag("video:description", v.description.slice(0, 2048)),
     ...(v.content ? tag("video:content_loc", new URL(v.content, page).href) : tag("video:player_loc", new URL(v.player!, page).href)),
     ...tag("video:duration", v.duration === undefined ? undefined : Math.round(v.duration)),
-    ...tag("video:publication_date", w3c(v.publicationDate)),
+    ...tag("video:publication_date", w3cDate(v.publicationDate)),
     ...tag("video:family_friendly", v.familyFriendly === undefined ? undefined : v.familyFriendly ? "yes" : "no"),
     ...tag("video:live", v.live === undefined ? undefined : v.live ? "yes" : "no"),
     "</video:video>",
@@ -40,7 +37,7 @@ function videoXml(v: Video, page: string): string | null {
 }
 
 function newsXml(n: News): string | null {
-  const date = w3c(n.publicationDate);
+  const date = w3cDate(n.publicationDate);
   if (!date || !n.title || !n.publication?.name || !n.publication?.language) return null;
   return `<news:news><news:publication>${tag("news:name", n.publication.name)}${tag("news:language", n.publication.language)}</news:publication>${tag("news:publication_date", date)}${tag("news:title", n.title)}</news:news>`;
 }
@@ -57,7 +54,9 @@ function urlXml(e: Entry): string {
   for (const a of e.alternates ?? []) {
     lines.push(`    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}"/>`);
   }
-  if (e.lastmod) lines.push(`    <lastmod>${escapeXml(e.lastmod)}</lastmod>`);
+  // Every writer's date passes here, transform's and a crawled page's included.
+  const lastmod = w3cDate(e.lastmod);
+  if (lastmod) lines.push(`    <lastmod>${escapeXml(lastmod)}</lastmod>`);
   for (const image of [...new Set(e.images ?? [])].slice(0, MAX_IMAGES)) {
     lines.push(`    <image:image><image:loc>${escapeXml(new URL(image, e.loc).href)}</image:loc></image:image>`);
   }
@@ -113,6 +112,6 @@ export function indexXml(parts: { loc: string; lastmod?: string }[], stylesheet?
   return `${head(stylesheet)}<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${items.join("\n")}\n</sitemapindex>\n`;
 }
 
-/** The newest date among the entries, for an index part's lastmod. */
+/** The newest valid date among the entries, for an index part's lastmod. */
 export const newest = (entries: Entry[]) =>
-  entries.reduce<string | undefined>((max, e) => (e.lastmod && (!max || e.lastmod > max) ? e.lastmod : max), undefined);
+  entries.reduce<string | undefined>((max, e) => (w3cDate(e.lastmod) && (!max || e.lastmod! > max) ? e.lastmod!.trim() : max), undefined);

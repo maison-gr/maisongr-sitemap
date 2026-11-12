@@ -1,4 +1,4 @@
-import { dateOf, expand, linkFolders, matches, trimSlashes, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
+import { dateOf, expand, linkFolders, matches, trimSlashes, w3cDate, type DateLike, type ExpandOptions, type Locales } from "./entries.js";
 import { DEFAULT_PALETTE } from "./build/palette.js";
 import { indexPage, pageCss, PAGE_JS, urlsetPage, xmlCss } from "./page.js";
 import type { Entry, Manifest, Palette, Theme } from "./types.js";
@@ -173,7 +173,9 @@ export function createSitemap(options: SitemapOptions = {}): SitemapHandler {
         const changed = new Map<string, Entry[]>();
         for (const [name, list] of all) {
           const out = await Promise.all(list.map((e) => options.transform!(e)));
-          changed.set(name, out.filter((e): e is Entry => e !== null && e !== undefined));
+          // A date transform sets is checked like any other, so the page shows what the XML lists.
+          const dated = ({ lastmod, ...e }: Entry): Entry => (w3cDate(lastmod) ? { ...e, lastmod: w3cDate(lastmod) } : e);
+          changed.set(name, out.filter((e): e is Entry => e !== null && e !== undefined).map(dated));
         }
         return changed;
       })();

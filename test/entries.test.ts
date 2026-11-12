@@ -215,4 +215,9 @@ describe("dateOf", () => {
     expect(dateOf("2026-11-04T08:00:00.000Z")).toBe("2026-11-04");
     for (const bad of ["2026-13-45", "04/11/2026", "", NaN, new Date("nope"), undefined, null]) expect(dateOf(bad as never)).toBeUndefined();
   });
+
+  it("rejects days the calendar doesn't have, which Date.parse rolls over into March (#12)", () => {
+    for (const bad of ["2026-02-30", "2026-02-31", "2026-02-29", "2026-04-31", "2026-02-30T08:00:00Z"]) expect(dateOf(bad), bad).toBeUndefined();
+    expect(dateOf("2028-02-29")).toBe("2028-02-29");
+  });
 });

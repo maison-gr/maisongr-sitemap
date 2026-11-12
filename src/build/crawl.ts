@@ -1,4 +1,4 @@
-import { trimSlashes } from "../entries.js";
+import { trimSlashes, w3cDate } from "../entries.js";
 import type { Entry, Theme } from "../types.js";
 import { styleBlocks } from "./project.js";
 import { privateOf } from "./route-rules.js";
@@ -65,7 +65,12 @@ function statedDate(html: string, lastModified: string | null): string | undefin
   const meta = tags(html, "meta").find((t) => ["property", "name", "itemprop"].some((n) => /^(?:article:modified_time|og:updated_time|datemodified|last-modified)$/i.test(attr(t, n) ?? "")));
   const ld = html.match(/"dateModified"\s*:\s*"([^"]+)"/)?.[1];
   for (const value of [meta && attr(meta, "content"), ld]) {
-    if (value && !Number.isNaN(Date.parse(value))) return value;
+    if (!value) continue;
+    // A W3C date as the page wrote it; another form Date.parse reads ("November 12, 2026") as one.
+    if (w3cDate(value)) return w3cDate(value);
+    // Its day, when it starts with one, must be on the calendar: Date.parse rolls 2026-02-30 into March.
+    const day = value.trim().match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    if ((!day || w3cDate(day)) && !Number.isNaN(Date.parse(value))) return new Date(Date.parse(value)).toISOString();
   }
   // A Last-Modified that is "now" is a dynamic page stamping every response, not a real date.
   if (lastModified) {

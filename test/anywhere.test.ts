@@ -245,6 +245,17 @@ describe("crawl", () => {
     expect(report.theme.fonts).toEqual([{ family: "Atlas Sans", role: "body", files: [{ url: "/fonts/atlas.woff2" }] }]);
   });
 
+  it("turns a date a page states in another form into a W3C date, and drops one that isn't a day (#12)", async () => {
+    const base = await site({
+      "/": () => ({ body: html('<meta property="article:modified_time" content="November 12, 2026 10:00 UTC">', ["/a", "/b"]) }),
+      "/a": () => ({ body: html('<meta property="article:modified_time" content="2026-02-30">', []) }),
+      "/b": () => ({ body: html('<script type="application/ld+json">{"dateModified":"2026-05-06"}</script>', []) }),
+    });
+    const report = await crawl(`${base}/`, { site: "https://www.atlas.example" });
+    const byPath = Object.fromEntries(report.entries.map((e) => [new URL(e.loc).pathname, e.lastmod]));
+    expect(byPath).toEqual({ "/": "2026-11-12T10:00:00.000Z", "/a": undefined, "/b": "2026-05-06" });
+  });
+
   it("stops at --max, and the command writes the files where the server serves them", async () => {
     const base = await site({
       "/": () => ({ body: html("<title>Shop</title>", ["/a", "/b", "/c"]) }),

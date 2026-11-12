@@ -49,6 +49,19 @@ describe("image, video and news sitemaps", () => {
     expect(xml.match(/<news:news>/g)).toHaveLength(1);
   });
 
+  it("writes only real W3C dates, whatever set them (#12)", () => {
+    const video = { thumbnail: "/t.jpg", title: "T", description: "D", content: "/v.mp4", publicationDate: "2026-02-30" };
+    const news = { publication: { name: "Harbour Daily", language: "en" }, title: "Spring tides", publicationDate: "2026-02-29T08:00:00Z" };
+    const xml = urlsetXml([
+      { loc: page, lastmod: "Thu Nov 12 2026", videos: [video] },
+      { loc: `${page}-2`, lastmod: "2026-02-30", news },
+      { loc: `${page}-3`, lastmod: "2026-11-12T08:00:00Z" },
+    ]);
+    expect(xml.match(/<lastmod>[^<]*<\/lastmod>/g)).toEqual(["<lastmod>2026-11-12T08:00:00Z</lastmod>"]);
+    expect(xml).not.toContain("publication_date");
+    expect(xml).not.toContain("<news:news>");
+  });
+
   it("takes images from a dynamic route's rows, in every language", async () => {
     const out = await expand([{ pattern: "/[locale]/blog/[slug]" }], {
       site: "https://www.example.com",

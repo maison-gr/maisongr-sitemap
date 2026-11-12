@@ -281,6 +281,17 @@ describe("createSitemap", () => {
     expect(xml).toContain("<image:loc>https://www.example.com/studio.jpeg</image:loc>");
   });
 
+  it("leaves out a date transform sets that isn't a real W3C date, on the XML and the page alike (#12)", async () => {
+    const shaped = createSitemap({
+      manifest: { ...manifest, routes: [{ pattern: "/" }, { pattern: "/work" }], locales: undefined },
+      transform: (e) => ({ ...e, lastmod: e.loc.endsWith("/work") ? "2026-11-12" : "Thu Nov 12 2026" }),
+    });
+    const xml = await (await get(shaped)).text();
+    expect(xml.match(/<lastmod>[^<]*<\/lastmod>/g)).toEqual(["<lastmod>2026-11-12</lastmod>"]);
+    const html = await (await get(shaped, "/sitemap.xml", true)).text();
+    expect(html).not.toContain("Thu Nov 12 2026");
+  });
+
   it("takes a site's readonly lists as they are (this test only compiles if it does)", async () => {
     const images: readonly string[] = ["/cover.jpg"];
     const slugs: readonly string[] = ["a", "b"];
