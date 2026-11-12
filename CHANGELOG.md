@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-12
+
 ### Fixed
 
 - In a Next.js project with no dynamic pages, the generated `app/sitemap.xml/params.ts` no longer imports `staticParams` it never uses, so the project's lint stays clean ([#11](https://github.com/maison-gr/maisongr-sitemap/issues/11)).
@@ -196,6 +198,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.8.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.1
 [1.8.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.0
 [1.7.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.7.0
 [1.6.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.6.0
