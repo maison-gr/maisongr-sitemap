@@ -487,7 +487,7 @@ npx skills add maison-gr/maisongr-sitemap
 {
   "ok": true,
   "command": "init",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "subject": "Next.js 16 · App Router",
   "sections": [{ "heading": "Wrote", "items": [{ "status": "ok", "text": "app/sitemap.xml/route.ts" }] }],
   "warnings": 0

@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-12
+
 ### Fixed
 
 - `?part=` answers 404 unless it is a part number the index lists (`1`, `2`, …): `?part=abc` or `?part=0` no longer serve a sitemap under a second address ([#14](https://github.com/maison-gr/maisongr-sitemap/issues/14)).
@@ -204,6 +206,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.8.2]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.2
 [1.8.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.1
 [1.8.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.0
 [1.7.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.7.0
