@@ -288,6 +288,19 @@ describe("dynamic pages that list their own values", () => {
     expect(params).not.toContain("notes");
   });
 
+  it("imports staticParams only when a page uses it, so a site without dynamic pages lints clean (#11)", async () => {
+    const root = project({
+      "package.json": '{"dependencies":{"next":"16"}}',
+      "tsconfig.json": "{}",
+      "app/page.tsx": "",
+      "app/about/page.tsx": "",
+    });
+    await buildNext(root, detect(root) as never, { offline: true });
+    const params = readFileSync(join(root, "app/sitemap.xml/params.ts"), "utf8");
+    expect(params).not.toContain("import");
+    expect(params).toContain("export const pageParams = {");
+  });
+
   it("hands a Pages Router page's getStaticPaths to the sitemap", async () => {
     const root = project({
       "package.json": '{"dependencies":{"next":"16"}}',
