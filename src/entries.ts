@@ -9,7 +9,22 @@ export type ParamRow = { lastmod?: DateLike; images?: readonly string[] } & Reco
 /** A row's images, when it gives any: the page's own, for the image sitemap. */
 const imagesOf = (row: ParamRow) => (Array.isArray(row.images) && row.images.length ? { images: row.images } : {});
 
-const W3C_DATE = /^(\d{4}-\d{2}-\d{2})(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+const W3C_DATE = /^(\d{4})-(\d{2})-(\d{2})(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * A W3C date or datetime as written, or undefined. The day must be on the
+ * calendar: Date.parse rolls 2026-02-30 over into March rather than refusing it,
+ * and one invalid date makes Search Console reject the whole file.
+ */
+export function w3cDate(value: string | undefined): string | undefined {
+  const text = value?.trim();
+  const m = text?.match(W3C_DATE);
+  if (!text || !m || Number.isNaN(Date.parse(text))) return undefined;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const day = new Date(Date.UTC(2000, mo - 1, d));
+  day.setUTCFullYear(y);
+  return day.getUTCMonth() === mo - 1 && day.getUTCDate() === d ? text : undefined;
+}
 
 /**
  * A lastmod as YYYY-MM-DD, or undefined when the value is not a real date:
@@ -19,8 +34,7 @@ export function dateOf(value: DateLike | undefined | null): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value === "string") {
     // The date as written, so a timestamp keeps the day its author meant.
-    const day = value.trim().match(W3C_DATE)?.[1];
-    return day && !Number.isNaN(Date.parse(day)) ? day : undefined;
+    return w3cDate(value)?.slice(0, 10);
   }
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
