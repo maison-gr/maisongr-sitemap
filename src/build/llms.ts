@@ -1,3 +1,4 @@
+import { readable } from "../entries.js";
 import { attr } from "./static.js";
 
 /**
@@ -60,7 +61,7 @@ function sections(pages: PageInfo[]): [string, PageInfo[]][] {
   return [...by].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
 }
 
-const title = (key: string) => (key ? decodeURIComponent(key).replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Pages");
+const title = (key: string) => (key ? readable(key).replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Pages");
 
 /** The file itself: the site's name, what its home page says it is, and its pages by section. */
 export function llmsText(site: { name: string; description?: string; pages: PageInfo[] }): string {

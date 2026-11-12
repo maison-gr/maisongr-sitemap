@@ -92,6 +92,15 @@ export function trimSlashes(value: string): string {
   return value.slice(0, end);
 }
 
+/** A path segment decoded for reading ("caf%C3%A9" → "café"), or as written when a % in it isn't an escape ("50%off"). */
+export function readable(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 // A parameter's name holds neither "[" nor "]", so each match can be read only one way.
 const SEGMENT = /\[\[?(?:\.\.\.)?([^[\]]+)\]\]?/g;
 /** A segment with a parameter anywhere in it: "[slug]", and also "v[version]" or "[lang]-docs" (Astro, SvelteKit). */

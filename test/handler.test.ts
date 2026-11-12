@@ -292,6 +292,15 @@ describe("createSitemap", () => {
     expect(html).not.toContain("Thu Nov 12 2026");
   });
 
+  it("draws the page when a folder has a stray %, titling its section as written (#13)", async () => {
+    const odd = createSitemap({ manifest: { ...manifest, routes: [], locales: undefined }, entries: () => [{ loc: "/50%off/a" }, { loc: "/50%off/b" }, { loc: "/caf%C3%A9/a" }, { loc: "/caf%C3%A9/b" }] });
+    const res = await get(odd, "/sitemap.xml", true);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain(">/50%off/</h2>");
+    expect(html).toContain(">/café/</h2>");
+  });
+
   it("takes a site's readonly lists as they are (this test only compiles if it does)", async () => {
     const images: readonly string[] = ["/cover.jpg"];
     const slugs: readonly string[] = ["a", "b"];

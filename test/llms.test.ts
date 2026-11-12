@@ -58,6 +58,12 @@ describe("llms.txt", () => {
     );
   });
 
+  it("titles a section whose folder has a stray % as written, rather than stopping (#13)", () => {
+    const text = llmsText({ name: "Atelier", pages: [{ url: `${PUBLIC}/50%off/a`, title: "A" }, { url: `${PUBLIC}/50%off/b`, title: "B" }, { url: `${PUBLIC}/caf%C3%A9/x`, title: "X" }] });
+    expect(text).toContain("## 50%off\n");
+    expect(text).toContain("## Café\n");
+  });
+
   async function site(): Promise<string> {
     const pages: Record<string, string> = {
       "/sitemap.xml": `<sitemapindex><sitemap><loc>${PUBLIC}/sitemap.xml?sitemap=pages</loc></sitemap></sitemapindex>`,

@@ -8,6 +8,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 - In a Next.js project with no dynamic pages, the generated `app/sitemap.xml/params.ts` no longer imports `staticParams` it never uses, so the project's lint stays clean ([#11](https://github.com/maison-gr/maisongr-sitemap/issues/11)).
 - Only real W3C dates reach `<lastmod>`, `<video:publication_date>` and `<news:publication_date>`. Days the calendar doesn't have (`2026-02-30`, `2026-02-29`) are left out, as other invalid dates already were; a date set in `transform` is checked like any other; and `crawl` turns a date a page states in another form ("November 12, 2026") into a W3C date ([#12](https://github.com/maison-gr/maisongr-sitemap/issues/12)).
+- A folder with a `%` that isn't an escape (`/50%off/`) no longer stops the sitemap page people open or `llms`: its section is titled as written ([#13](https://github.com/maison-gr/maisongr-sitemap/issues/13)).
 
 ## [1.8.0] - 2026-11-11
 
