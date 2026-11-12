@@ -77,6 +77,16 @@ describe("expand", () => {
     expect(out).toEqual([{ loc: `${site}/fr/blog/seulement`, lastmod: undefined, lang: "fr", alternates: undefined }]);
   });
 
+  it("names only the language versions it lists as alternates, never an excluded one (#15)", async () => {
+    const locales = { list: ["en", "fr", "de"], default: "en" };
+    const out = await expand([{ pattern: "/[locale]/about" }], { site, locales, exclude: ["/de/about"] });
+    expect(out.map((e) => e.loc)).toEqual([`${site}/en/about`, `${site}/fr/about`]);
+    for (const e of out) expect(e.alternates!.map((a) => a.href)).toEqual([`${site}/en/about`, `${site}/fr/about`, `${site}/en/about`]);
+    // Without the default language there is no x-default; one version left has no alternates.
+    const fr = await expand([{ pattern: "/[locale]/about" }], { site, locales, exclude: ["/en/about", "/de/about"] });
+    expect(fr).toEqual([{ loc: `${site}/fr/about`, lastmod: undefined, lang: "fr", alternates: undefined }]);
+  });
+
   it("drops excluded paths and duplicates", async () => {
     const out = await expand([{ pattern: "/a" }, { pattern: "/drafts/x" }, { pattern: "/a" }], { site, exclude: ["/drafts/"] });
     expect(out.map((e) => e.loc)).toEqual([`${site}/a`]);

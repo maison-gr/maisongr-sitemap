@@ -194,15 +194,15 @@ export async function expand(routes: Route[], options: ExpandOptions): Promise<E
     for (const [tail, versions] of groups) {
       const pathOf = (locale: string) =>
         locale === fallback && options.locales!.prefixDefault === false ? tail : `/${locale}${tail === "/" ? "" : tail}`;
-      const present = versions.map((v) => v.locale);
+      // Alternates name only the versions listed: an excluded one is often noindex, and Search Console reports it.
+      const listed = versions.filter((v) => !matches(pathOf(v.locale), options.exclude ?? []));
+      const present = listed.map((v) => v.locale);
       const alternates = [
         ...present.map((l) => ({ hreflang: hreflangOf(l, options.locales), href: url(pathOf(l)) })),
         ...(present.includes(fallback) ? [{ hreflang: "x-default", href: url(pathOf(fallback)) }] : []),
       ];
-      for (const v of versions) {
-        const path = pathOf(v.locale);
-        if (matches(path, options.exclude ?? [])) continue;
-        out.push({ loc: url(path), lastmod: v.lastmod, lang: v.locale, alternates: present.length > 1 ? alternates : undefined, ...(v.images ? { images: v.images } : {}) });
+      for (const v of listed) {
+        out.push({ loc: url(pathOf(v.locale)), lastmod: v.lastmod, lang: v.locale, alternates: present.length > 1 ? alternates : undefined, ...(v.images ? { images: v.images } : {}) });
       }
     }
   }
