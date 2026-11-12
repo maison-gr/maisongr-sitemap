@@ -7,6 +7,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 ### Fixed
 
 - `?part=` answers 404 unless it is a part number the index lists (`1`, `2`, …): `?part=abc` or `?part=0` no longer serve a sitemap under a second address ([#14](https://github.com/maison-gr/maisongr-sitemap/issues/14)).
+- A language version left out by `exclude` is no longer named as an `hreflang` alternate (or `x-default`) of the versions the sitemap lists ([#15](https://github.com/maison-gr/maisongr-sitemap/issues/15)).
 
 ## [1.8.1] - 2026-11-12
 
