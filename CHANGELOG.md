@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each release adds 0.0.1 to the version (1.8.2, 1.8.3, 1.8.4), whatever it contains.
 
 ## [Unreleased]
 
