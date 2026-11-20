@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { blocks, scopes } from "../src/build/css.js";
 import { cssFonts } from "../src/build/css-fonts.js";
-import { isWoff2, nextFonts } from "../src/build/fonts.js";
+import { isWoff2, materialize, nextFonts } from "../src/build/fonts.js";
 import { contrast, palette } from "../src/build/palette.js";
 
 const dirs: string[] = [];
@@ -105,6 +105,69 @@ describe("fonts from next/font", () => {
     const layout = `import localFont from "next/font/local";
       const display = localFont({ src: "../../fonts/instrument-sans.woff2", variable: "--app-font-display" });`;
     expect(nextFonts(layout, "/proj/src/app/[lang]")[0]).toMatchObject({ family: "Instrument Sans", role: "display" });
+  });
+});
+
+describe("Google fonts already in public/_sitemap (#18)", () => {
+  const woff2 = (tag: number) => Buffer.from([0x77, 0x4f, 0x46, 0x32, tag, tag, tag]);
+  const withFonts = () => {
+    const root = project({});
+    const dir = join(root, "public", "_sitemap");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "newsreader-400-600.woff2"), woff2(1));
+    writeFileSync(join(dir, "newsreader-400-600-italic.woff2"), woff2(2));
+    writeFileSync(join(dir, "ibm-plex-mono-400.woff2"), woff2(3));
+    writeFileSync(join(dir, "ibm-plex-mono-500.woff2"), woff2(4));
+    // Another family whose name starts the same way is not mistaken for Plex Mono.
+    writeFileSync(join(dir, "ibm-plex-mono-arabic-400.woff2"), woff2(5));
+    return { publicDir: join(root, "public"), dir };
+  };
+  const sources = [
+    { kind: "google", family: "Newsreader", role: "display" },
+    { kind: "google", family: "IBM Plex Mono", role: "mono" },
+  ] as const;
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps a committed font when Google cannot be reached", async () => {
+    const { publicDir } = withFonts();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    const { fonts, missed } = await materialize([...sources], publicDir);
+    expect(missed).toEqual([]);
+    expect(fonts).toEqual([
+      {
+        role: "display",
+        family: "Newsreader",
+        files: [
+          { url: "/_sitemap/newsreader-400-600.woff2", weight: "400 600", style: "normal" },
+          { url: "/_sitemap/newsreader-400-600-italic.woff2", weight: "400 600", style: "italic" },
+        ],
+      },
+      {
+        role: "mono",
+        family: "IBM Plex Mono",
+        files: [
+          { url: "/_sitemap/ibm-plex-mono-400.woff2", weight: "400", style: "normal" },
+          { url: "/_sitemap/ibm-plex-mono-500.woff2", weight: "500", style: "normal" },
+        ],
+      },
+    ]);
+  });
+
+  it("never rewrites a committed font, even when Google serves other bytes", async () => {
+    const { publicDir, dir } = withFonts();
+    const fetch = vi.fn(async () => new Response(woff2(9)));
+    vi.stubGlobal("fetch", fetch);
+    await materialize([...sources], publicDir);
+    expect(readFileSync(join(dir, "ibm-plex-mono-400.woff2"))).toEqual(woff2(3));
+    expect(readFileSync(join(dir, "newsreader-400-600.woff2"))).toEqual(woff2(1));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses committed fonts in an offline build too", async () => {
+    const { publicDir } = withFonts();
+    const { fonts, missed } = await materialize([...sources], publicDir, true);
+    expect(missed).toEqual([]);
+    expect(fonts.map((f) => f.family)).toEqual(["Newsreader", "IBM Plex Mono"]);
   });
 });
 
