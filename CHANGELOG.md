@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-11-20
+
 ### Fixed
 
 - A Google font already in `public/_sitemap/` is reused instead of downloaded again, so every build gives the same files and the same manifest: Google re-encoding a file no longer leaves a changed font to commit, and a failed download no longer drops a committed font (and the page's typeface) from the manifest. Delete a font's files to fetch it again ([#18](https://github.com/maison-gr/maisongr-sitemap/issues/18)).
@@ -210,6 +212,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.8.3]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.3
 [1.8.2]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.2
 [1.8.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.1
 [1.8.0]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.0
