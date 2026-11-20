@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve as resolvePath } from "node:path";
 import type { Font, FontRole } from "../types.js";
 
@@ -77,6 +77,27 @@ export const isWoff2 = (bytes: Uint8Array) => bytes.length > 4 && bytes[0] === 0
 const UA ="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+/**
+ * A Google font a previous build already wrote to public/_sitemap/, read from its file names
+ * ("newsreader-400-600-italic.woff2" → weight "400 600", italic). Reusing it keeps every build
+ * byte-for-byte the same and safe from a failed download (#18); delete the files to fetch them again.
+ */
+function committed(family: string, role: FontRole, publicDir: string): Font | null {
+  const dir = join(publicDir, FONT_DIR);
+  if (!existsSync(dir)) return null;
+  const prefix = `${slug(family)}-`;
+  const files: Font["files"] = [];
+  for (const name of readdirSync(dir).sort()) {
+    if (!name.startsWith(prefix)) continue;
+    const m = name.slice(prefix.length).match(/^(\d+)(?:-(\d+))?(-italic)?\.woff2$/);
+    if (!m || !isWoff2(readFileSync(join(dir, name)))) continue;
+    files.push({ url: `/${FONT_DIR}/${name}`, weight: m[2] ? `${m[1]} ${m[2]}` : m[1]!, style: m[3] ? "italic" : "normal" });
+  }
+  // Upright before italic, then by weight: the order a download lists them in.
+  files.sort((a, b) => Number(a.style === "italic") - Number(b.style === "italic") || parseInt(a.weight!) - parseInt(b.weight!));
+  return files.length ? { role, family, files } : null;
+}
+
 /** Downloads a Google font's Latin files once, at build time, so the page serves them from the site itself. */
 async function google(family: string, role: FontRole, publicDir: string): Promise<Font | null> {
   const name = encodeURIComponent(family).replace(/%20/g, "+");
@@ -149,7 +170,10 @@ export async function materialize(sources: FontSource[], publicDir: string, offl
   const missed: string[] = [];
   for (const s of sources) {
     if (fonts.some((f) => f.role === s.role)) continue; // one font per role
-    const font = s.kind === "local" ? local(s, publicDir) : offline ? null : await google(s.family, s.role, publicDir);
+    const font =
+      s.kind === "local"
+        ? local(s, publicDir)
+        : (committed(s.family, s.role, publicDir) ?? (offline ? null : await google(s.family, s.role, publicDir)));
     if (font) fonts.push(font);
     else missed.push(s.family);
   }

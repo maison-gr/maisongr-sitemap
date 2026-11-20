@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Fixed
+
+- A Google font already in `public/_sitemap/` is reused instead of downloaded again, so every build gives the same files and the same manifest: Google re-encoding a file no longer leaves a changed font to commit, and a failed download no longer drops a committed font (and the page's typeface) from the manifest. Delete a font's files to fetch it again ([#18](https://github.com/maison-gr/maisongr-sitemap/issues/18)).
+
 ## [1.8.2] - 2026-11-12
 
 ### Fixed
