@@ -518,6 +518,15 @@ Node 20.9 or later. No runtime dependencies.
 
 The package is an ES module. A CommonJS project that calls `require("maisongr-sitemap/node")` itself needs Node 20.19 or 22.12 or later, which load ES modules through `require`; the `sitemap.js` that `init` writes loads it with `import()`, which works on every supported version.
 
+## More from Maison GR
+
+Open source from [Maison GR](https://www.maisongr.com), a software studio in Québec City:
+
+- [Maison GR Sitemap for WordPress](https://github.com/maison-gr/maisongr-sitemap-wordpress): the same sitemap for WordPress, in your theme's colours and type.
+- [maisongr-skills](https://github.com/maison-gr/maisongr-skills): one engineering standard for every AI coding agent: Claude Code, Codex, Cursor, Copilot, Gemini CLI.
+- [maisongr-typo](https://github.com/maison-gr/maisongr-typo): French typography, the Québec way, with a CI check.
+- [maisongr-law25](https://github.com/maison-gr/maisongr-law25): your Law 25 privacy impact assessment, next to your code, checked in CI.
+
 ## License
 
-MIT © [Maison GR](https://www.maisongr.com)
+MIT © [Maison GR Inc.](https://www.maisongr.com)
