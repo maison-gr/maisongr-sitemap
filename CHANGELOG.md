@@ -4,6 +4,10 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+### Fixed
+
+- A translucent site colour (`#rrggbbaa`, `#rgba`, `rgba()`, `rgb(… / 30%)`, `hsla()`) was measured as if it were solid, so a faint grey could pass the AA check for the page's secondary text, and a pale accent the 3:1 check for focus rings. The contrast is now measured as the colour shows on the page background. Same fix as the WordPress plugin's, whose 7.2 default theme writes its colours with alpha.
+
 ## [1.8.3] - 2026-11-20
 
 ### Fixed
