@@ -69,6 +69,19 @@ describe("theme from the site's stylesheet", () => {
     expect(palette(light)!.muted).toBe("color-mix(in srgb, #111111 68%, #ffffff)");
   });
 
+  it("measures a translucent colour as it shows on the background, not as if it were solid", () => {
+    // 30% black on white shows as #b2b2b2: about 2.1:1, whatever the colour's notation.
+    for (const faint of ["#0000004d", "#0005", "rgba(0, 0, 0, 0.3)", "rgb(0 0 0 / 30%)", "hsla(0, 0%, 0%, 0.3)"]) {
+      const ratio = contrast(faint, "#ffffff")!;
+      expect(ratio, faint).toBeGreaterThan(1.9);
+      expect(ratio, faint).toBeLessThan(2.4);
+    }
+    // 75% black, as WordPress 7.2's default theme sets its text, still reads (about 10:1).
+    expect(contrast("#000000bf", "#fcfcfc")).toBeGreaterThan(9.5);
+    const { light } = read(`:root{--background:#ffffff;--foreground:#111111;--muted-foreground:#0000004d}`);
+    expect(palette(light)!.muted).toBe("color-mix(in srgb, #111111 68%, #ffffff)");
+  });
+
   it("ignores comments and strings", () => {
     const { light } = read(`/* :root { --background: red } */ :root { --background: #fafafa; --foreground: #101010; content: "}"; }`);
     expect(palette(light)!.background).toBe("#fafafa");
