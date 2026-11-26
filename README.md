@@ -8,7 +8,7 @@
 ![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-1b1a17)
 ![Node 20.9+](https://img.shields.io/badge/node-%E2%89%A520.9-1b1a17)
 
-![One address, two answers: at https://your.site/sitemap.xml, Google and Bing get the standard XML sitemap, and a person opening the same address in a browser gets a page in the site's own design.](.github/assets/hero.png)
+![Maison GR open source, 01: maisongr-sitemap. One sitemap, two readers. Next to it, npx maisongr-sitemap init at work: 8 pages found and dated from Git, the site's theme read, a private page left out, the sitemap route written.](.github/assets/hero.jpg)
 
 ```sh
 npx maisongr-sitemap init
