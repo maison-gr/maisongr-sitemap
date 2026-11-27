@@ -14,15 +14,22 @@ const MIDDLEWARE = ["middleware.ts", "middleware.js", "proxy.ts", "proxy.js", "s
 
 /**
  * The site's languages: for routes under a [locale] folder, or, with no such
- * folder, when the middleware puts every page under /{language}/.
+ * folder, when the middleware puts every page under /{language}/. A middleware
+ * that names locales doesn't do that when the pages already sit in a
+ * language's folder (app/fr/about as its own route): it may only tell the 404
+ * page which language was asked for, and prefixing every route would list
+ * /en/about and /fr/fr/about, which don't exist.
  */
 function localesOf(root: string, routes: { pattern: string }[], files: string[]): Manifest["locales"] {
   const segmented = routes.some((r) => /^\/\[(locale|lang)\]/.test(r.pattern));
   const middleware = MIDDLEWARE.map((f) => join(root, f)).find(existsSync);
-  const prefixed = !segmented && !!middleware && /locale/i.test(read(middleware));
-  if (!segmented && !prefixed) return undefined;
+  const namesLocales = !segmented && !!middleware && /locale/i.test(read(middleware));
+  if (!segmented && !namesLocales) return undefined;
   const found = findLocales(files);
   if (!found) return undefined;
+  const inFolders = routes.some((r) => found.list.includes(r.pattern.split("/")[1] ?? ""));
+  const prefixed = namesLocales && !inFolders;
+  if (!segmented && !prefixed) return undefined;
   const hreflang = findHreflang(files, found.list);
   return { ...found, ...(prefixed ? { prefix: true } : {}), ...(hreflang ? { hreflang } : {}) };
 }

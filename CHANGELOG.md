@@ -6,6 +6,7 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ### Fixed
 
+- In a Next.js project whose pages already sit in a language's folder (`app/fr/about`, French addresses of their own), a middleware that merely names a locale (to tell the 404 page which language was asked for, say) no longer makes the build put every route under `/{language}/`. The sitemap listed `/en/about` and `/fr/fr/about`, which don't exist, and its page offered a bare `FR` beside the site's `FR-CA`. Languages are still added when the middleware routes every page by locale and no route sits in a language's folder.
 - A translucent site colour (`#rrggbbaa`, `#rgba`, `rgba()`, `rgb(… / 30%)`, `hsla()`) was measured as if it were solid, so a faint grey could pass the AA check for the page's secondary text, and a pale accent the 3:1 check for focus rings. The contrast is now measured as the colour shows on the page background. Same fix as the WordPress plugin's, whose 7.2 default theme writes its colours with alpha.
 
 ## [1.8.3] - 2026-11-20
