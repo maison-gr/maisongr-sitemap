@@ -377,6 +377,24 @@ describe("languages added by middleware", () => {
     expect(report.missedFonts).toEqual(["Newsreader"]); // offline; the Arabic cut is never attempted
   });
 
+  it("adds no prefix when the pages already sit in a language's folder, whatever the middleware says of locales", async () => {
+    // A proxy that only tells the 404 page the visitor asked for French, beside French pages with their own addresses.
+    const root = project({
+      "package.json": '{"dependencies":{"next":"16"}}',
+      "app/(site)/page.tsx": "",
+      "app/(site)/about/page.tsx": "",
+      "app/(site-fr)/fr/page.tsx": "",
+      "app/(site-fr)/fr/a-propos/page.tsx": "",
+      "proxy.ts": 'import { LOCALE_HEADER } from "@/lib/not-found-locale";\nexport function proxy(r) { headers.set(LOCALE_HEADER, "fr"); }\nexport const config = { matcher: ["/fr/:path*"] };',
+      "lib/site-routes.ts": 'export type Locale = "en" | "fr";',
+    });
+    const report = await buildNext(root, detect(root) as never, { offline: true });
+    expect(report.locales).toBeUndefined();
+    const { expand } = await import("../src/entries.js");
+    const out = await expand([{ pattern: "/" }, { pattern: "/about" }, { pattern: "/fr" }, { pattern: "/fr/a-propos" }], { site: "https://x.dev", locales: report.locales });
+    expect(out.map((e) => e.loc)).toEqual(["https://x.dev/", "https://x.dev/about", "https://x.dev/fr", "https://x.dev/fr/a-propos"]);
+  });
+
   it("adds no languages when nothing routes by them", async () => {
     const root = project({ "package.json": '{"dependencies":{"next":"15"}}', "app/page.tsx": "", "lib/i18n.ts": 'export const LOCALES = ["en", "fr"];' });
     expect((await buildNext(root, detect(root) as never, { offline: true })).locales).toBeUndefined();
