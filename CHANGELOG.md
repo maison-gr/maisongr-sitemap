@@ -4,6 +4,8 @@ All notable changes to `maisongr-sitemap`. The format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-11-26
+
 ### Fixed
 
 - In a Next.js project whose pages already sit in a language's folder (`app/fr/about`, French addresses of their own), a middleware that merely names a locale (to tell the 404 page which language was asked for, say) no longer makes the build put every route under `/{language}/`. The sitemap listed `/en/about` and `/fr/fr/about`, which don't exist, and its page offered a bare `FR` beside the site's `FR-CA`. Languages are still added when the middleware routes every page by locale and no route sits in a language's folder.
@@ -217,6 +219,7 @@ The first release.
 - `init` says when `robots.txt` doesn't name the sitemap.
 - Next.js 16 `cacheComponents` support: the route is written without the `dynamic` export that mode refuses.
 
+[1.8.4]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.4
 [1.8.3]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.3
 [1.8.2]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.2
 [1.8.1]: https://github.com/maison-gr/maisongr-sitemap/releases/tag/v1.8.1
